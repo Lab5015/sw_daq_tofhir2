@@ -298,25 +298,28 @@ class Config:
                         return int( tmp[vth_str]*(def_range[vth_str]+1)/(disc_range+1) + value)
 		return int( tmp[vth_str] + value)
                 
-	def mapALDOVoltageToDAC(self, (portID, slaveID, chipID), bd, ov):
-                retA = -1
-                retB = -1
-                bestA = 9999.
-                bestB = 9999.
-                for key in self.__ALDOACalibrationTable[(portID, slaveID, chipID)]:
-                        val = self.__ALDOACalibrationTable[(portID, slaveID, chipID)][key]
-                        if abs( float(val) - (float(bd)+float(ov)) ) < bestA:
-                                retA = key
-                                bestA = abs( float(val) - (float(bd)+float(ov)) )
-                for key in self.__ALDOBCalibrationTable[(portID, slaveID, chipID)]:
-                        val = self.__ALDOBCalibrationTable[(portID, slaveID, chipID)][key]
-                        if abs( float(val) - (float(bd)+float(ov)) ) < bestB:
-                                retB = key
-                                bestB = abs( float(val) - (float(bd)+float(ov)) )
-                print("ALDO A(J2) on ASIC%d:   DAC: %d   V: %f") %(chipID,int(retA),float(self.__ALDOACalibrationTable[(portID, slaveID, chipID)][retA]))
-                print("ALDO B(J4) on ASIC%d:   DAC: %d   V: %f") %(chipID,int(retB),float(self.__ALDOBCalibrationTable[(portID, slaveID, chipID)][retB]))
+        def mapALDOVoltageToDAC(self, (portID, slaveID, chipID, aldoID), bd, ov):
+                ret = -1
+                best = 9999.
+                table = {}
+                if aldoID is 'A':
+                        table = self.__ALDOACalibrationTable[(portID, slaveID, chipID)]
+                if aldoID is 'B':
+                        table = self.__ALDOBCalibrationTable[(portID, slaveID, chipID)]
+                
+                for key in table:
+                        val = table[key]
+                        if abs( float(val) - (float(bd)+float(ov)) ) < best:
+                                ret = key
+                                best = abs( float(val) - (float(bd)+float(ov)) )
+                print("ALDO %s on ASIC%d:   DAC: %d   V: %f") %(aldoID,chipID,int(ret),float(table[ret]))
+                return ret
+
+        def mapALDODACToVoltage(self, (portID, slaveID, chipID), dac):
+                retA = float(self.__ALDOACalibrationTable[(portID, slaveID, chipID)][dac])
+                retB = float(self.__ALDOBCalibrationTable[(portID, slaveID, chipID)][dac])
                 return retA, retB
-                        
+
 def toInt(s):
 	s = s.upper()
 	if s[0:2] == "0X":
@@ -408,8 +411,8 @@ def readSiPMBiasTableAldo(fn):
 	for l in f:
 		l = normalizeAndSplit(l)
 		if l == ['']: continue
-		portID, slaveID, chipID = [ int(v) for v in l[0:3] ]
-		c[(portID, slaveID, chipID)] = [ float(v) for v in l[3:5] ]
+                portID, slaveID, chipID, aldoID = [ int(l[0]), int(l[1]), int(l[2]), l[3] ]
+                c[(portID, slaveID, chipID, aldoID)] = [ float(v) for v in l[4:6] ]
 	f.close()
 	return c
 

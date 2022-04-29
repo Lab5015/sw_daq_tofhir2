@@ -13,15 +13,15 @@ parser.add_argument("--pedestals", dest="pedestals", action="store_true", help="
 args = parser.parse_args()
 
 if args.mode == 'r':
-    command = "./convert_raw_to_raw --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+" -o /data/TOFHIR2/reco/run"+args.run+"_r.root"
+    command = "./convert_raw_to_raw --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+" -o /data/TOFHIR2/reco/run"+args.run+"_r.root"
     os.system(command)
 
 if args.mode == 's':
-    mainCommand = "./convert_raw_to_singles --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+" --writeRoot"
+    mainCommand = "./convert_raw_to_singles --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+" --writeRoot"
     if args.pedestals:
-        command = "./convert_raw_to_singles --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+"_ped1 -o /data/TOFHIR2/reco/run"+args.run+"_ped1_s.root --writeRoot"
+        command = "./convert_raw_to_singles --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+"_ped1 -o /data/TOFHIR2/reco/run"+args.run+"_ped1_s.root --writeRoot"
         os.system(command)
-        command = "./convert_raw_to_singles --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+"_ped2 -o /data/TOFHIR2/reco/run"+args.run+"_ped2_s.root --writeRoot"
+        command = "./convert_raw_to_singles --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+"_ped2 -o /data/TOFHIR2/reco/run"+args.run+"_ped2_s.root --writeRoot"
         os.system(command)
         command = "./analyze_pedestals.exe /data/TOFHIR2/reco/run"+args.run+"_ped1_s.root /data/TOFHIR2/reco/run"+args.run+"_ped2_s.root /data/TOFHIR2/reco/run"+args.run+"_pedestals.root"
         os.system(command)
@@ -31,15 +31,15 @@ if args.mode == 's':
     os.system(mainCommand)
 
 if args.mode == 'c':
-    command = "./convert_raw_to_coincidence --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+" -o /data/TOFHIR2/reco/run"+args.run+"_c.root --writeRoot"
+    command = "./convert_raw_to_coincidence --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+" -o /data/TOFHIR2/reco/run"+args.run+"_c.root --writeRoot"
     os.system(command)
 
 if args.mode == 'e':
-    mainCommand = "./convert_raw_to_event --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+" --writeRoot"
+    mainCommand = "./convert_raw_to_event --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+" --writeRoot"
     if args.pedestals:
-        command = "./convert_raw_to_singles --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+"_ped1 -o /data/TOFHIR2/reco/run"+args.run+"_ped1_s.root --writeRoot"
+        command = "./convert_raw_to_singles --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+"_ped1 -o /data/TOFHIR2/reco/run"+args.run+"_ped1_s.root --writeRoot"
         os.system(command)
-        command = "./convert_raw_to_singles --config "+args.config+" -i /data/TOFHIR2/raw/run"+args.run+"_ped2 -o /data/TOFHIR2/reco/run"+args.run+"_ped2_s.root --writeRoot"
+        command = "./convert_raw_to_singles --config "+args.config+" -i /storage/TOFHIR2/raw/run"+args.run+"_ped2 -o /data/TOFHIR2/reco/run"+args.run+"_ped2_s.root --writeRoot"
         os.system(command)
         command = "./analyze_pedestals.exe /data/TOFHIR2/reco/run"+args.run+"_ped1_s.root /data/TOFHIR2/reco/run"+args.run+"_ped2_s.root /data/TOFHIR2/reco/run"+args.run+"_pedestals.root"
         os.system(command)
