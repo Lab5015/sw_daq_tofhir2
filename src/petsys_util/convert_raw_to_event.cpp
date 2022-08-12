@@ -51,7 +51,7 @@ private:
 	long long 	brStepEnd;
         
 	unsigned short	brN;
-        int             brChannelIdx[128];
+        int             brChannelIdx[256];
         std::vector<long long>        	brTime;
 	std::vector<unsigned int>	brChannelID;
 	std::vector<float>		brToT;
@@ -90,7 +90,7 @@ public:
                 if( pedestalFile != NULL )
                 {
                   std::cout << "pedestals!" << std::endl;
-                  for(int ch = 0; ch < 128; ++ch)
+                  for(int ch = 0; ch < 256; ++ch)
                   {
                     TProfile* prof = (TProfile*)( pedestalFile->Get(Form("p_qfine_ch%d_2",ch)) );
                     if( !prof ) continue;
@@ -114,7 +114,7 @@ public:
                         hData->Branch("prevEventTime", &brPrevEventTime, bs);
                         hData->Branch("timeLast", &brTimeLast, bs);
 			hData->Branch("mh_n", &brN, bs);
-			hData->Branch("channelIdx", brChannelIdx, "channelIdx[128]/I");
+			hData->Branch("channelIdx", brChannelIdx, "channelIdx[256]/I");
 			hData->Branch("tot", &brToT);
 			hData->Branch("t1coarse", &brT1Coarse);
 			hData->Branch("t1fine", &brT1Fine);
@@ -215,7 +215,7 @@ public:
 			brQT1.clear();
 			brQT2.clear();
 			brTacID.clear();
-			for(unsigned int jj = 0; jj < 128; ++jj) brChannelIdx[jj] = -1;
+			for(unsigned int jj = 0; jj < 256; ++jj) brChannelIdx[jj] = -1;
 			channelCount.clear();
 			
                         brTimeLast = brTimeLastTmp;
@@ -349,7 +349,7 @@ int main(int argc, char *argv[])
         char *inputFilePrefix = NULL;
         char *outputFileName = NULL;
 	FILE_TYPE fileType = FILE_TEXT;
-	int hitLimitToWrite = 128;
+	int hitLimitToWrite = 256;
 	long long eventFractionToWrite = 1024;
         bool coincidence = false;
         int refChannel = -1;
