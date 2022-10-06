@@ -288,8 +288,8 @@ void RawReader::processStep(int n, bool verbose, EventSink<RawHit> *sink)
 			long long tq = (t1 & 0x7FFFFFFFFFFFFC00LL) | eventWord.getQCoarse();
 			long long tp = (t1 & 0x7FFFFFFFFFFFF000LL) | (eventWord.getPrevEventTime() << 2);
 
-			if(t2 < t1) t2 += 1024;
-			if(tq < t1) tq += 1024;
+			if((t2+2) < t1) t2 += 1024;
+			if((tq+2) < t1) tq += 1024;
 			if(tp >= t1) tp -= 4096;
 			
 			e.time = t1 - (currentBufferFirstFrame * 1024);
