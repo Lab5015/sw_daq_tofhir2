@@ -60,6 +60,7 @@ configure_file("src/petsys_util/acquire_qdc_calibration" "acquire_qdc_calibratio
 configure_file("src/petsys_util/acquire_sipm_data" "acquire_sipm_data" COPYONLY)
 configure_file("src/petsys_util/acquire_sipm_data_basic" "acquire_sipm_data_basic" COPYONLY)
 configure_file("src/petsys_util/acquire_sipm_data_scan" "acquire_sipm_data_scan" COPYONLY)
+configure_file("src/petsys_util/acquire_sipm_stressTest" "acquire_sipm_stressTest" COPYONLY)
 configure_file("src/petsys_util/convert.py" "convert.py" COPYONLY)
 configure_file("src/petsys_util/make_bias_calibration_table" "make_bias_calibration_table" COPYONLY)
 configure_file("src/petsys_util/make_simple_bias_settings_table" "make_simple_bias_settings_table" COPYONLY)
