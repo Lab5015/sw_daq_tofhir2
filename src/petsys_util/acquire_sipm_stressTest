@@ -1,0 +1,206 @@
+#!/usr/bin/env python
+import sys
+import os
+sys.path.insert(1, os.path.join(sys.path[0], '../build_new/'))
+from petsys import daqd, config
+from copy import deepcopy
+from time import sleep
+import argparse
+import ROOT
+import math
+from datetime import datetime
+from ROOT import TFile
+
+sys.path.append("/home/cmsdaq/Programs/Lab5015Utils/")
+#from Lab5015_utils import Keithley2450
+from Lab5015_utils import KeithleyDMM6500
+from Lab5015_utils import PiLas
+
+parser = argparse.ArgumentParser(description='Acquire SiPM IV scan')
+parser.add_argument("--config", type=str, required=True, help="Configuration file")
+parser.add_argument("--bv", type=float, dest="bv", required=True, help="initial bv")
+parser.add_argument("--aldoA", dest="aldoA", action="store_true", help="do aldo A")
+parser.add_argument("--aldoB", dest="aldoB", action="store_true", help="do aldo B")
+parser.add_argument("--ch", dest="keyChannel", required=True, help="which multimeter channel to read")
+parser.add_argument("--time", type=float, dest="time", required=True, help="number of measurements to average")
+parser.add_argument("--label", type=str, dest="label", required=True, help="folder name")
+parser.add_argument("--verbose", dest="verb", action="store_true", help="set to true to display output and plots, otherwise just save to root file")
+parser.add_argument("--laser", dest="laser", action="store_true", help="pilot laser")
+parser.add_argument("--asic", type=int, dest="asic", required=True, help="asic id")
+
+#------------------------
+# parsing input arguments
+args = parser.parse_args()
+verbose = False
+if args.verb:
+    verbose = True
+
+
+#---------------------------------
+# connect and configure multimeter
+#mykey = Keithley2450()
+mykey = KeithleyDMM6500()
+mykey.closeChannel(int(args.keyChannel))
+mykey.read()
+las = None
+if args.laser:
+    las = PiLas()
+    lasState = 0
+    if args.laser:
+        las.set_state(lasState)
+
+
+#-----------------------------
+# load configuration from file
+mask = config.LOAD_ALL
+# if args.mode != "mixed":
+#         mask ^= config.LOAD_QDCMODE_MAP
+mask ^= config.LOAD_QDCMODE_MAP
+systemConfig = config.ConfigFromFile(args.config, loadMask=mask)
+
+daqd = daqd.Connection()
+daqd.initializeSystem()
+systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_ON)
+
+hvdac_config = daqd.get_hvdac_config()                                                                                                                                                                                                                                                                                                                             
+for portID, slaveID, railID in hvdac_config.keys():                                                                                                                                                                                                                                                                                                                
+    # set 48 V as ALDO input bias (should not exceed this value)                                                                                                                                                                                                                                                                                               
+    hvdac_config[(portID, slaveID, railID)] = systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 46)                                                                                                                                                                                                                                           
+daqd.set_hvdac_config(hvdac_config)
+
+asicsConfig = daqd.getAsicsConfig()
+activeAsics = daqd.getActiveAsics()
+
+if len(activeAsics) == 0:
+    print ("no active ASICs found. Exiting...")
+    exit()
+    
+asicsConfig0 = deepcopy(asicsConfig)
+cfg = deepcopy(asicsConfig0)
+
+for portID, slaveID, chipID in activeAsics:
+        if chipID%2 is not 0:
+                continue
+        if chipID != args.asic: continue 
+        ac = cfg[(portID, slaveID, chipID)]
+        gc = (cfg[(portID, slaveID, chipID)]).globalConfig
+        gc.setValue("c_aldo_en", 0b00)
+        daqd.setAsicsConfig(cfg)
+        sleep(0.1)
+        this_volt = 0.
+        
+        for it in range(0,5):
+            #(_, this_volt) = mykey.meas_V()
+            this_volt = mykey.read()
+            this_curr = this_volt*1E06/10.
+            sleep(0.5)
+            print( "ALDO off   V_meas: %.3f mV -->  I: %f uA" % (1000.*this_volt,this_curr))
+
+
+#--------------
+# define graphs
+g_I = ROOT.TGraph()
+
+
+#--------
+# ov scan
+for portID, slaveID, chipID in activeAsics:
+        if chipID%2 is not 0:
+                continue
+
+        if chipID != args.asic: continue
+
+        ac = cfg[(portID, slaveID, chipID)]
+        volt = args.bv
+        dac = 0
+        
+        gc = (cfg[(portID, slaveID, chipID)]).globalConfig
+        if args.aldoA and not args.aldoB:
+            dac = systemConfig.mapALDOVoltageToDAC((portID, slaveID, chipID, 'A'),30.,args.bv-30.)
+            gc.setValue("c_aldo_en", 0b10)
+            gc.setValue("Valdo_A_DAC", dac)
+        if args.aldoB and not args.aldoA:
+            dac = systemConfig.mapALDOVoltageToDAC((portID, slaveID, chipID, 'B'),30.,args.bv-30.)
+            gc.setValue("c_aldo_en", 0b01)
+            gc.setValue("Valdo_B_DAC", dac)
+        daqd.setAsicsConfig(cfg)
+        
+        sleep(1.)
+        
+        curr  = 0.
+        vMeas = 0.
+        nMeas = 1
+        
+        timestamp_init = datetime.now()
+
+        while True:
+            this_volt = 0.
+            #(_, this_volt) = mykey.meas_V()
+            this_volt = mykey.read()
+            tihs_volt = abs(this_volt)
+            this_curr = this_volt*1E06/10.
+            if verbose:
+                print ("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*this_volt,this_curr))
+            g_I.SetPoint(g_I.GetN(),g_I.GetN(),this_curr)
+                        
+            timestamp_curr = datetime.now()
+            sleep(0.2)
+            if args.laser:
+                if float((timestamp_curr - timestamp_init).total_seconds()) > args.time/4. and lasState is 0:
+                    las.set_trigger(0)
+                    las.set_freq(50000)
+                    #las.set_freq(467000)
+                    #las.set_freq(10000)
+                    lasState = 1
+                    las.set_state(lasState)
+            if float((timestamp_curr - timestamp_init).total_seconds()) > args.time:
+                break
+
+
+#-------------------------
+# switch off bias voltages
+
+systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_OFF)
+
+for portID, slaveID, chipID in activeAsics:
+        if chipID%2 is not 0:
+                continue
+        gc = (cfg[(portID, slaveID, chipID)]).globalConfig
+        gc.setValue("c_aldo_en", 0b00)
+daqd.setAsicsConfig(cfg)                                                                                                                                           
+
+if args.laser:
+    lasState = 0
+    las.set_state(lasState)
+
+
+#---------
+# plotting
+now = datetime.now()
+this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
+os.system("mkdir ../log_stressTest/%s/"%args.label)
+outfile_name = ("../log_stressTest/%s/IV_bv%.2f_time_%s.root"%(args.label,args.bv,this_time))
+print('saving data to: %s' % outfile_name)
+
+outFile = TFile(outfile_name,"RECREATE")
+outFile.cd()
+g_I.SetName("g_I")
+g_I.Write()
+outFile.Write()
+outFile.Close()
+
+if verbose:
+    c1 = ROOT.TCanvas("c1","c1",500,500)
+    g_I.SetTitle("I vs i measurement;i measurement;current")
+    g_I.Draw("APL")
+    min_time = g_I.GetPointX(0)
+    max_time = g_I.GetPointX(g_I.GetN()-1)
+    fitFunc_dark = ROOT.TF1('fitFunc_dark','pol0',min_time,min_time+(max_time-min_time)/5.)
+    g_I.Fit(fitFunc_dark,'RNS')
+    fitFunc_dark.SetLineColor(ROOT.kRed)
+    fitFunc_dark.Draw('same')
+    fitFunc_phot = ROOT.TF1('fitFunc_phot','pol0',min_time+(max_time-min_time)/3.,max_time)
+    g_I.Fit(fitFunc_phot,'RNS')
+    fitFunc_phot.SetLineColor(ROOT.kGreen)
+    fitFunc_phot.Draw('same')
+    raw_input("ok?")
