@@ -60,6 +60,7 @@ configure_file("src/petsys_util/acquire_qdc_calibration" "acquire_qdc_calibratio
 configure_file("src/petsys_util/acquire_sipm_data" "acquire_sipm_data" COPYONLY)
 configure_file("src/petsys_util/acquire_sipm_data_basic" "acquire_sipm_data_basic" COPYONLY)
 configure_file("src/petsys_util/acquire_sipm_data_scan" "acquire_sipm_data_scan" COPYONLY)
+configure_file("src/petsys_util/acquire_sipm_IV_scan" "acquire_sipm_IV_scan" COPYONLY)
 configure_file("src/petsys_util/acquire_sipm_stressTest" "acquire_sipm_stressTest" COPYONLY)
 configure_file("src/petsys_util/scan_aldo_hv" "scan_aldo_hv" COPYONLY)
 configure_file("src/petsys_util/convert.py" "convert.py" COPYONLY)
