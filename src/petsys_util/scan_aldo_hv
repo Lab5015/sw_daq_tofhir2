@@ -1,0 +1,120 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+from petsys import daqd, config
+from copy import deepcopy
+import argparse
+import serial
+from time import sleep
+
+sys.path.append("/home/cmsdaq/Programs/Lab5015Utils/")
+#from Lab5015_utils import Keithley2450
+from Lab5015_utils import KeithleyDMM6500
+keyChannels = { 
+        (0,"A") : 3,
+        (0,"B") : 4,
+        (2,"A") : 7,
+        (2,"B") : 8
+}
+
+asics = [i[0] for i in keyChannels.keys()]
+asics = list(set(asics))
+
+def main(argv):
+
+	parser = argparse.ArgumentParser(description='Acquire data for ALDO calibration')
+	parser.add_argument("--config", type=str, required=True, help="Configuration file")
+	parser.add_argument("-o", type=str, dest="fileNamePrefix", required=True, help="Data filename (prefix)")
+	args = parser.parse_args()
+
+	mask = config.LOAD_ALL
+	mask ^= config.LOAD_QDCMODE_MAP
+	systemConfig = config.ConfigFromFile(args.config, loadMask=mask)
+	
+        #mykey = Keithley2450()
+        mykey = KeithleyDMM6500()
+        
+	conn = daqd.Connection()
+	conn.initializeSystem()
+	systemConfig.loadToHardware(conn, bias_enable=config.APPLY_BIAS_ON, hw_trigger_enable=False, qdc_mode = "tot")
+        activeAsics = conn.getActiveAsics() 
+        
+	# hvdac_config = conn.get_hvdac_config()
+        # 
+	# for portID, slaveID, railID in hvdac_config.keys():
+	# 	hvdac_config[(portID, slaveID, railID)] = systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 46)
+        # 
+	# conn.set_hvdac_config(hvdac_config)
+        
+        
+	asicsConfig = conn.getAsicsConfig()
+	for ac in asicsConfig.values():
+		gc = ac.globalConfig
+		gc.setValue("c_aldo_en", 0b00)
+		gc.setValue("c_aldo_range", 0b00)
+
+		#aldo_dac_gain = 0
+		#gc.setValue("Valdo_A_Gain", aldo_dac_gain)
+		#gc.setValue("Valdo_A_DAC", 255)
+		#gc.setValue("Valdo_B_Gain", aldo_dac_gain)
+		#gc.setValue("Valdo_B_DAC", 255)
+
+	conn.setAsicsConfig(asicsConfig)
+
+	asicsConfig0 = deepcopy(asicsConfig)
+        for portID, slaveID, chipID in activeAsics:
+                
+                if (chipID%2) != 0:
+                        continue
+                
+                ac = asicsConfig0[(portID, slaveID, chipID)] 
+                
+		for which_aldo in  ['A', 'B']:
+		#for which_aldo in  ['A']:
+			#print "Connect to ALDO %s" % which_aldo
+			#raw_input("Press ENTER to continue")
+	                
+	                mykey.closeChannel(keyChannels[(chipID,which_aldo)])
+	                
+			for aldo_range in [ "low", "high" ]:
+                                
+				f = open("%s_ASIC%d_ALDO_%s_%s.tsv" % (args.fileNamePrefix, chipID, which_aldo, aldo_range), "w") 
+	                        print("%s_ASIC%d_ALDO_%s_%s.tsv" % (args.fileNamePrefix, chipID, which_aldo, aldo_range))			
+				asicsConfig = deepcopy(asicsConfig0)
+                                gc = (asicsConfig[(portID, slaveID, chipID)]).globalConfig
+				for dac in range(0, 256, 1):
+                                        gc.setValue("Valdo_%s_DAC" % which_aldo, dac)
+                                        if aldo_range == "low":
+                                                gc.setValue("Valdo_%s_Gain" % which_aldo, 0)
+                                        elif aldo_range == "high":
+                                                gc.setValue("Valdo_%s_Gain" % which_aldo, 1)
+                                        else:
+                                                raise "aldo range has bad value %s" % aldo_range
+                                        if which_aldo == 'A':
+                                                gc.setValue("c_aldo_en", 0b10)
+                                        elif which_aldo == 'B':
+                                                gc.setValue("c_aldo_en", 0b01)
+                                        conn.setAsicsConfig(asicsConfig)
+                                        if dac is 0:
+                                                sleep(2.)
+                                        else:
+                                                sleep(0.2)
+                                        
+                                        #(_, voltage) = mykey.meas_V()
+                                        voltage = mykey.read()
+                                        print which_aldo, dac, float(voltage)
+                                        f.write("%d\t%f\n" % (dac, float(voltage)))
+                                f.close()
+                        
+                        
+	asicsConfig = conn.getAsicsConfig()
+        for ac in asicsConfig.values():
+                gc = ac.globalConfig
+                gc.setValue("c_aldo_en", 0b00)
+                gc.setValue("c_aldo_range", 0b00)
+	conn.setAsicsConfig(asicsConfig)
+
+
+if __name__ == '__main__':
+	sys.exit(main(sys.argv))
