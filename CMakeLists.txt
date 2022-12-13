@@ -63,6 +63,7 @@ configure_file("src/petsys_util/acquire_sipm_data_scan" "acquire_sipm_data_scan"
 configure_file("src/petsys_util/acquire_sipm_stressTest" "acquire_sipm_stressTest" COPYONLY)
 configure_file("src/petsys_util/scan_aldo_hv" "scan_aldo_hv" COPYONLY)
 configure_file("src/petsys_util/convert.py" "convert.py" COPYONLY)
+configure_file("src/petsys_util/create_ALDO_calibration_combined.py" "create_ALDO_calibration_combined.py" COPYONLY)
 configure_file("src/petsys_util/make_bias_calibration_table" "make_bias_calibration_table" COPYONLY)
 configure_file("src/petsys_util/make_simple_bias_settings_table" "make_simple_bias_settings_table" COPYONLY)
 configure_file("src/petsys_util/make_simple_channel_map" "make_simple_channel_map" COPYONLY)
