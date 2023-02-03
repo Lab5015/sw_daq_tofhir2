@@ -44,7 +44,6 @@ parser.add_argument("--freq", type=float, dest="freq", required=False, help="int
 parser.add_argument("--phase", type=float, dest="phase", required=False, help="trigger phase (in clk)")
 parser.add_argument("--prescale", type=int, dest="prescale", required=False, help="external trigger prescale [0..63]")
 parser.add_argument("--l1", dest="l1", action="store_true", help="Enable the L1 filtering")
-parser.add_argument("--pedestals", dest="pedestals", action="store_true", help="Enable the acquisition of pedestals")
 parser.add_argument("--enable-channels", dest="enChannels", required=False, help="comma separated vector of enabled channels")
 parser.add_argument("--fix-channels", dest="fixChannels", required=False, help="comma separated vector of channels for which ith1 is fixed at 30")
 parser.add_argument("--wait", dest="wait", action="store_true", help="wait 60 sec. before starting the run")
@@ -81,11 +80,6 @@ if not args.fileNamePrefix:
 else:
         run = args.fileNamePrefix
 
-if args.pedestals:
-        print("INFO: acquiring pedestals")
-        command = "./acquire_qdc_calibration_fixed  --config "+args.config+" -o "+args.fileNamePrefix+"_ped1"
-        os.system(command)
-
 
 #---------------------
 # copy the config file
@@ -106,7 +100,7 @@ systemConfig = config.ConfigFromFile(args.config, loadMask=mask)
 
 daqd = daqd.Connection()
 daqd.initializeSystem()
-systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_ON)
+systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_OFF)
 
 asicsConfig = daqd.getAsicsConfig()
 activeAsics = daqd.getActiveAsics()
@@ -114,6 +108,9 @@ activeAsics = daqd.getActiveAsics()
 if len(activeAsics) == 0:
         print "no active ASICs found. Exiting..."
         exit()
+else:
+        print "active ASICs found: "
+        print activeAsics
 
 
 #--------------
@@ -126,19 +123,19 @@ if args.trigger == "int":
         daqd.setTestPulsePLL(100, int(1./(args.freq*6.25e-06)), args.phase, False)
 if args.trigger == "ext":
         # Enable EXTERNAL L1 trigger source from J15
-        ext_delay = 1917 # Delay added by FPGA in 6.25 ns increments
-        daqd.write_config_register_tgr(8, 0x21A, 0x11)
-        daqd.write_config_register_tgr(64, 0x02A0, (1<<63) | (0<<62) | (3 << 48) | ( args.prescale << 16) | (ext_delay) ) # prescale: 0..63 -- 0 is 0%, 63 is 63/64%
+        daqd.write_config_register_tgr(8, 0x21A, 0x01)
+        #ext_delay = 1917 # Delay added by FPGA in 6.25 ns increments
+        #daqd.write_config_register_tgr(64, 0x02A0, (1<<63) | (0<<62) | (3 << 48) | ( args.prescale << 16) | (ext_delay) ) # prescale: 0..63 -- 0 is 0%, 63 is 63/64%
 
 
 #--------------------------------------------------------------------
 # enable ALDO in case needed (it's only on even ASICs, e.g. 0,2,4...)
-if args.aldo:
-        hvdac_config = daqd.get_hvdac_config()
-        for portID, slaveID, railID in hvdac_config.keys():
-                # set 48 V as ALDO input bias (should not exceed this value)
-                hvdac_config[(portID, slaveID, railID)] = systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 46)
-        daqd.set_hvdac_config(hvdac_config)
+#if args.aldo:
+#        hvdac_config = daqd.get_hvdac_config()
+#        for portID, slaveID, railID in hvdac_config.keys():
+#                # set 48 V as ALDO input bias (should not exceed this value)
+#                hvdac_config[(portID, slaveID, railID)] = systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 46)
+#        daqd.set_hvdac_config(hvdac_config)
 
 
 #------------------------------------------------
@@ -169,13 +166,13 @@ if args.trigger == "ext":
                         continue
                 gc = asicsConfig[(portID, slaveID, chipID)].globalConfig
                 # Enable L1 trigger for even ASICs (with flex and ALDO)
-                if args.l1 :
-                        gc.setValue("c_l1_enable", 0b01)
-                else:
-                        gc.setValue("c_l1_enable", 0b00)
-                gc.setValue("c_l1_latency", 484) # Delay expected by ASIC in 25 ns increments
+                #if args.l1 :
+                #        gc.setValue("c_l1_enable", 0b01)
+                #else:
+                #        gc.setValue("c_l1_enable", 0b00)
+                #gc.setValue("c_l1_latency", 484) # Delay expected by ASIC in 25 ns increments
         # Use ASIC 1 channel 0 to timetag the trigger pulses
-        asicsConfig[(0, 0, 1)].globalConfig.setValue("c_ext_tp_en", 0b1)
+        asicsConfig[(0, 0, 1)].globalConfig.setValue("c_ext_tp_en", 1)
         asicsConfig[(0, 0, 1)].channelConfig[0].setValue("c_tgr_main", 0b01)
 
 
@@ -212,23 +209,38 @@ for ith1 in ith1_list:
                                                         cc.setValue("cfg_a2_pulse_trim_t",int(args.trimT))
                                                 if args.trimE:
                                                         cc.setValue("cfg_a2_pulse_trim_e",int(args.trimE))
-                                                         
                                                 
-                                                #cc.setValue("cfg_a3_ith_t1", ith1)
-                                                #cc.setValue("cfg_a3_ith_t2", ith2)
-                                                #cc.setValue("cfg_a3_ith_e", ithe)
-                                                
-                                                dac_setting_ith1 = systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t1", int(ith1))
-                                                cc.setValue("cfg_a3_ith_t1", dac_setting_ith1)
-                                                dac_setting_ith2 = systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t2", int(ith2))
-                                                cc.setValue("cfg_a3_ith_t2", dac_setting_ith2)
-                                                dac_setting_ithe = systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_e", int(ithe))
-                                                cc.setValue("cfg_a3_ith_e", dac_setting_ithe)
-                                                #print("%d %d %d %d : %d,%d,%d") % (portID,slaveID,chipID,channelID,dac_setting_ith1,dac_setting_ith2,dac_setting_ithe)
-                                                
+                                                # raw thresholds
+                                                #dac_setting_ith1 = int(ith1)
+                                                #dac_setting_ith2 = int(ith2)
+                                                #dac_setting_ithe = int(ithe)
+                                                # baseline-subtracted thresholds
+                                                dac_setting_ith1 = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t1", int(ith1)) )
+                                                dac_setting_ith2 = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t2", int(ith2)) )
+                                                dac_setting_ithe = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_e", int(ithe)) )
+                                                # T1-relative T2 threshold
                                                 if args.ith2rel:
-                                                        dac_setting_ith2 = systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t2", int(ith1)+int(ith2))
-                                                        cc.setValue("cfg_a3_ith_t2", dac_setting_ith2)
+                                                        dac_setting_ith2 = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t2", int(ith1)+int(ith2)) )
+                                                        
+                                                cc.setValue("cfg_a3_ith_t1", dac_setting_ith1)
+                                                cc.setValue("cfg_a3_ith_t2", dac_setting_ith2)
+                                                cc.setValue("cfg_a3_ith_e", dac_setting_ithe)
+                                                
+                                                ############# FIXME
+                                                # if chipID == 2:
+                                                #         dac_setting_ith1 = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t1", 10) )
+                                                #         dac_setting_ith2 = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t2", 10) )
+                                                #         dac_setting_ithe = min( 63, systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_e",   1) )                                                        
+                                                #         cc.setValue("cfg_a3_ith_t1", dac_setting_ith1)
+                                                #         cc.setValue("cfg_a3_ith_t2", dac_setting_ith2)
+                                                #         cc.setValue("cfg_a3_ith_e", dac_setting_ithe)
+                                                #         cc.setValue("cfg_a2_attenuator_gain",0)
+                                                #         cc.setValue("cfg_a2_dcr_delay_e",0b0000011)
+                                                #######################
+
+
+                                                if channelID == 0:
+                                                        print("%d %d %d %d : %d,%d,%d") % (portID,slaveID,chipID,channelID,dac_setting_ith1,dac_setting_ith2,dac_setting_ithe)
                                 
                                 if( args.fixChannels ):
                                         for ac in cfg.values():
@@ -263,14 +275,23 @@ for ith1 in ith1_list:
                                                 for aldoID in ['A', 'B']:
                                                         bd, over__ = systemConfig.getBiasChannelDefaultSettingsAldo((portID, slaveID, chipID, aldoID))
                                                         dac = systemConfig.mapALDOVoltageToDAC((portID, slaveID, chipID, aldoID),bd,float(ov)+ovDrop)
+
+                                                        ### FIXME####################
+                                                        # if chipID == 2:
+                                                        #         dac = systemConfig.mapALDOVoltageToDAC((portID, slaveID, chipID, aldoID),bd,3.5)
+                                                        ##########################
                                                         gc.setValue("Valdo_%s_DAC"%aldoID, dac)
-                                
+
+
                                 daqd.setAsicsConfig(cfg)
                                 sleep(0.1)
                                 if args.wait:
                                         sleep(60.)
                                         args.wait = False
                                 print "ov: %3.1f,   ith1: %2d,   ith2: %2d,   ithe: %2d" % (float(ov), int(ith1), int(ith2), int(ithe))
+                                print ">>> t1: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t1"))
+                                print ">>> t2: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t2"))
+                                print ">>> e: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_e"))
                                 daqd.acquire(args.time, float(ov), 10000*(int(ith1)+1)+100*(int(ith2)+1)+int(ithe)+1)
                                         
 
@@ -284,12 +305,6 @@ if args.aldo:
                         continue
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b00)
-daqd.setAsicsConfig(cfg)
+        daqd.setAsicsConfig(cfg)
         
 daqd.setTestPulseNone()
-
-
-if args.pedestals:
-        print("INFO: acquiring pedestals")
-        command = "./acquire_qdc_calibration_fixed  --config "+args.config+" -o "+args.fileNamePrefix+"_ped2"
-        os.system(command)
