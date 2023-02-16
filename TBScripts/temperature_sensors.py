@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+
+from time import sleep
+
+
+def ltc2984_ll(conn,  chipID, command, rd):
+		portID, slaveID, cfgFunctionID = 0, 0, 0x2
+                
+		w = 8 * len(command)
+		padding = [0x00 for n in range(2) ]
+		p = 8 * len(padding)
+                
+		# Pad the cycle with zeros
+		return conn.spi_master_execute(portID, slaveID, cfgFunctionID, chipID, 
+			p+w+rd+p, 		# cycle
+			p,p+rd+w, 		# sclk en
+			p-1,p+w+rd+1,	# cs
+			0, p+w+p, 	# mosi
+			p+w,p+w+rd, 		# miso
+			padding + command + padding)
+
+		
+def ltc2984_write(conn, chipID, addr, n, value):
+	#print "WRITE"
+	cmd = (addr << (n*8)) | value
+	#print hex(addr), hex(value), hex(cmd)
+	cmd = [ 0x02 ] + [ (cmd >> (8*k)) & 0xFF for k in range(n+1, -1, -1) ]
+	#print [ "%02X" % v for v in cmd ]
+	#print "WRITE", "0x%03X" % addr, "0x%08X" % value, [ "%02X" % v for v in cmd ]
+	ltc2984_ll(conn, chipID, cmd, 0)
+
+
+def ltc2984_read(conn, chipID, addr, n):
+	#print "READ"
+	cmd = addr
+	#print hex(addr)
+	cmd = [ 0x03] + [ (cmd >> (8*k)) & 0xFF for k in range(1, -1, -1) ]
+	#print [ "%02X" % v for v in cmd ]
+	r = ltc2984_ll(conn, chipID, cmd, 8*n)
+	#print [ "%02X" % v for v in r ]
+	#print "READ ", "0x%03X" % addr, "          ", [ "%02X" % v for v in cmd ], "\t\t\t  ", [ "%02X" % v for v in r ]
+	return r
+
+
+def ltc2984_cfg_channels(conn):
+	
+	for chip in range(1):
+		for channel in [9, 7, 17, 15]:
+			addr = 0x200 + 0x04 * (channel - 1)
+			channel_cfg = 0x0000
+			channel_cfg |= (0b01111) << 27 #RTD
+			channel_cfg |= 0b10100 << 22 # RSENSE channel
+			channel_cfg |= 0b0001 << 18 # SENSE configuration (table 32)
+			channel_cfg |= 0b0101 << 14 # Excitation current
+			channel_cfg |= 0b00 << 12 # Curve
+			
+			ltc2984_write(conn, chip, addr, 4, channel_cfg)
+
+		# RSense Channel itself
+		addr = 0x200 + 0x04 * (20 - 1)
+		channel_cfg = 0x0000
+		channel_cfg |= (0b11101) << 27 #RSENSE
+		channel_cfg |= 5110 << 10 # RSENSE value (integer)
+		channel_cfg |= 0b0  # RSENSE value (fraction with 1/1024 precision)
+			
+		ltc2984_write(conn, chip, addr, 4, channel_cfg)
+
+	#r = ltc2984_read(conn, chip, addr, 4)
+	#print "READ ", "0x%03X" % addr, "          ", [ "%02X" % v for v in r ]
+
+
+def ltc_read_channels(conn):
+	result = {}
+        
+	for chip in range(1):
+		for channel in [9, 7, 17, 15]:
+			#print chip, channel
+			# start conversion
+			addr = 0x0000
+			value = 0b10000000 | channel
+			ltc2984_write(conn, chip, addr, 1, value)
+		
+			sleep(0.2)
+			# check for done
+			#r = ltc2984_read(conn, chip, addr, 1)
+			#print "READ ", "0x%03X" % addr, "          ", [ "%02X" % v for v in r ]
+			
+			# readout data
+			addr = 0x0010 + 0x04 * (channel - 1)
+			r = ltc2984_read(conn, chip, addr, 4)
+			#print "READ ", "0x%03X" % addr, "          ", [ "%02X" % v for v in r ]
+			status = r[1]
+			value = (r[2] << 16) + (r[3] << 8) + (r[4])
+			temperature = value / 1024.0                        
+                        if (temperature>10000):
+                            temperature=temperature-16384
+
+			if status == 0x01:
+				status_msg = "OK"
+			else:
+				status_msg = "ERR"
+			#print "CHIP %d CH %02d STATUS %03s (0x%02X) TEMP %10.3f C" % (chip, channel, status_msg, status, temperature)
+                        result[channel] = temperature
+	return result
