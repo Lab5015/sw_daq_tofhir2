@@ -1,7 +1,7 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import sys
 import os
-sys.path.insert(1, os.path.join(sys.path[0], '../build_new/'))
 from petsys import daqd, config
 from copy import deepcopy
 from time import sleep
@@ -10,38 +10,78 @@ import ROOT
 import math
 from datetime import datetime
 from ROOT import TFile
+from os.path import expanduser, join
 
-sys.path.append("/home/cmsdaq/Programs/Lab5015Utils/")
-#from Lab5015_utils import Keithley2450
-from Lab5015_utils import KeithleyDMM6500
-from Lab5015_utils import PiLas
+# Try to guess where the Lab5015Utils directory is
+sys.path.append(join(os.path.dirname(os.path.abspath(__file__)),"../..","Lab5015Utils"))
+try:
+    from Lab5015_utils import Keithley2450, PiLas
+except ImportError as e:
+    print("Error: unable to import from Lab5015_utils!")
+    print(e)
+    print("Maybe you need to add the directory to your PYTHONPATH environment variable?")
+    print("Example: $ export PYTHONPATH=/path/to/Lab5015_utils")
+    sys.exit(1)
+
+try:
+    from Lab5015_utils import Agilent3606A
+except ImportError as e:
+    print("Unable to import Agilent3606A from Lab5015_utils. Skipping...")
+
+try:
+    from Lab5015_utils import KeithleyDMM6500
+except ImportError as e:
+    print("Unable to import KeithleyDMM6500 from Lab5015_utils. Skipping...")
 
 parser = argparse.ArgumentParser(description='Acquire SiPM IV scan')
 parser.add_argument("--config", type=str, required=True, help="Configuration file")
-parser.add_argument("--bv", type=float, dest="bv", required=True, help="initial bv")
+parser.add_argument("--bv", type=float, required=True, help="initial bias voltage")
 parser.add_argument("--aldoA", dest="aldoA", action="store_true", help="do aldo A")
 parser.add_argument("--aldoB", dest="aldoB", action="store_true", help="do aldo B")
 parser.add_argument("--ch", dest="keyChannel", required=True, help="which multimeter channel to read")
 parser.add_argument("--time", type=float, dest="time", required=True, help="number of measurements to average")
 parser.add_argument("--label", type=str, dest="label", required=True, help="folder name")
-parser.add_argument("--verbose", dest="verb", action="store_true", help="set to true to display output and plots, otherwise just save to root file")
+parser.add_argument("--verbose", default=False, action="store_true", help="set to true to display output and plots, otherwise just save to root file")
 parser.add_argument("--laser", dest="laser", action="store_true", help="pilot laser")
 parser.add_argument("--asic", type=int, dest="asic", required=True, help="asic id")
+parser.add_argument("--keithley-model", type=int, choices=[2450,6500,3606], default=6500, help="Keithley model number (2450, 6500, or 3606 (3606 is actually Agilent))")
+parser.add_argument("--keithley-ip-address", type=str, default=None, help="Keithley IP address")
 
 #------------------------
 # parsing input arguments
 args = parser.parse_args()
-verbose = False
-if args.verb:
-    verbose = True
-
 
 #---------------------------------
 # connect and configure multimeter
-#mykey = Keithley2450()
-mykey = KeithleyDMM6500()
-mykey.closeChannel(int(args.keyChannel))
-mykey.read()
+
+if args.keithley_model in [2450, 6500]:
+    if args.keithley_ip_address is None:
+        ip_address_file = join(expanduser("~"),".keithley_ip_address.txt")
+
+        if os.path.exists(ip_address_file):
+            with open(ip_address_file) as f:
+                args.keithley_ip_address = f.read().strip()
+        else:
+            print("Must supply Keithley IP address! You can find it by going to settings and then communication")
+            sys.exit(1)
+    else:
+        ip_address_file = join(expanduser("~"),".keithley_ip_address.txt")
+        with open(ip_address_file,"w") as f:
+            f.write(args.keithley_ip_address)
+
+    portname = 'TCPIP0::%s::INSTR' % args.keithley_ip_address
+    print("Connecting to Keithley at ip address '%s'" % args.keithley_ip_address)
+    print("To change this IP address either edit ~/.keithley_ip_address.txt or remove that file and you will be prompted next time to enter it.")
+
+if args.keithley_model == 2450:
+    mykey = Keithley2450(portname)
+elif args.keithley_model == 3606:
+    mykey = Agilent3606A()
+else:
+    mykey = KeithleyDMM6500(portname)
+    mykey.closeChannel(int(args.keyChannel))
+    mykey.read()
+
 las = None
 if args.laser:
     las = PiLas()
@@ -90,9 +130,13 @@ for portID, slaveID, chipID in activeAsics:
         this_volt = 0.
         
         for it in range(0,5):
-            #(_, this_volt) = mykey.meas_V()
-            this_volt = mykey.read()
-            this_curr = this_volt*1E06/10.
+	    if args.keithley_model == 2450:
+		_, this_volt = mykey.meas_V()
+	    elif args.keithley_model == 3606:
+	        this_volt = mykey.meas_V()
+	    else:
+		this_volt = mykey.read()
+            this_curr = this_volt*1e06/10.
             sleep(0.5)
             print( "ALDO off   V_meas: %.3f mV -->  I: %f uA" % (1000.*this_volt,this_curr))
 
@@ -135,11 +179,15 @@ for portID, slaveID, chipID in activeAsics:
 
         while True:
             this_volt = 0.
-            #(_, this_volt) = mykey.meas_V()
-            this_volt = mykey.read()
-            tihs_volt = abs(this_volt)
+	    if args.keithley_model == 2450:
+		_, this_volt = mykey.meas_V()
+	    elif args.keithley_model == 3606:
+	        this_volt = mykey.meas_V()
+	    else:
+		this_volt = mykey.read()
+            this_volt = abs(this_volt)
             this_curr = this_volt*1E06/10.
-            if verbose:
+            if args.verbose:
                 print ("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*this_volt,this_curr))
             g_I.SetPoint(g_I.GetN(),g_I.GetN(),this_curr)
                         
@@ -178,7 +226,7 @@ if args.laser:
 # plotting
 now = datetime.now()
 this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
-os.system("mkdir ../log_stressTest/%s/"%args.label)
+os.system("mkdir -p ../log_stressTest/%s/"%args.label)
 outfile_name = ("../log_stressTest/%s/IV_bv%.2f_time_%s.root"%(args.label,args.bv,this_time))
 print('saving data to: %s' % outfile_name)
 
@@ -189,7 +237,7 @@ g_I.Write()
 outFile.Write()
 outFile.Close()
 
-if verbose:
+if args.verbose:
     c1 = ROOT.TCanvas("c1","c1",500,500)
     g_I.SetTitle("I vs i measurement;i measurement;current")
     g_I.Draw("APL")

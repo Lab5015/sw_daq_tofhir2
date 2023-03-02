@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+from __future__ import print_function
 from petsys import daqd, config
 from copy import deepcopy
 from time import sleep
@@ -11,10 +11,28 @@ import ROOT
 import sys
 import math
 from datetime import datetime 
+from os.path import expanduser, join
 
-sys.path.append("/home/cmsdaq/Programs/Lab5015Utils/")
-#from Lab5015_utils import Keithley2450
-from Lab5015_utils import KeithleyDMM6500
+# Try to guess where the Lab5015Utils directory is
+sys.path.append(join(os.path.dirname(os.path.abspath(__file__)),"../..","Lab5015Utils"))
+try:
+    from Lab5015_utils import Keithley2450, PiLas
+except ImportError as e:
+    print("Error: unable to import from Lab5015_utils!")
+    print(e)
+    print("Maybe you need to add the directory to your PYTHONPATH environment variable?")
+    print("Example: $ export PYTHONPATH=/path/to/Lab5015_utils")
+    sys.exit(1)
+
+try:
+    from Lab5015_utils import Agilent3606A
+except ImportError as e:
+    print("Unable to import Agilent3606A from Lab5015_utils. Skipping...")
+
+try:
+    from Lab5015_utils import KeithleyDMM6500
+except ImportError as e:
+    print("Unable to import KeithleyDMM6500 from Lab5015_utils. Skipping...")
 
 parser = argparse.ArgumentParser(description='Acquire SiPM IV scan')
 parser.add_argument("--config", type=str, required=True, help="Configuration file")
@@ -23,16 +41,13 @@ parser.add_argument("--bvMax", type=str, dest="bvMax", required=True, help="endi
 parser.add_argument("--aldo", type=str, dest="aldo", required=True, help="which ALDO")
 parser.add_argument("--nMeas", type=str, dest="nMeas", required=False, help="number of measurements to average")
 parser.add_argument("--label", type=str, dest="label", required=False, help="folder name")
-parser.add_argument("--verbose", dest="verb", action="store_true", help="set to true to display output and plots, otherwise just save to root file")
-
+parser.add_argument("--verbose", default=False, action="store_true", help="set to true to display output and plots, otherwise just save to root file")
+parser.add_argument("--keithley-model", type=int, choices=[2450,6500,3606], default=6500, help="Keithley model number (2450, 6500, or 3606 (3606 is actually Agilent))")
+parser.add_argument("--keithley-ip-address", type=str, default=None, help="Keithley IP address")
 
 #------------------------
 # parsing input arguments
 args = parser.parse_args()
-verbose = False
-if args.verb:
-    verbose = True
-
 
 #-----------------------------
 # load configuration from file
@@ -50,7 +65,7 @@ asicsConfig = daqd.getAsicsConfig()
 activeAsics = daqd.getActiveAsics()
 
 if len(activeAsics) == 0:
-        print "no active ASICs found. Exiting..."
+        print("no active ASICs found. Exiting...")
         exit()
 
 
@@ -65,10 +80,32 @@ if len(activeAsics) == 0:
 #        daqd.set_hvdac_config(hvdac_config)
 
 
-#mykey = Keithley2450()
-mykey = KeithleyDMM6500()
-mykey.set_read_V()
+if args.keithley_model in [2450, 6500]:
+    if args.keithley_ip_address is None:
+        ip_address_file = join(expanduser("~"),".keithley_ip_address.txt")
 
+        if os.path.exists(ip_address_file):
+            with open(ip_address_file) as f:
+               args.keithley_ip_address = f.read().strip()
+        else:
+            print("Must supply Keithley IP address! You can find it by going to settings and then communication")
+            sys.exit(1)
+    else:
+        ip_address_file = join(expanduser("~"),".keithley_ip_address.txt")
+        with open(ip_address_file,"w") as f:
+            f.write(args.keithley_ip_address)
+
+    portname = 'TCPIP0::%s::INSTR' % args.keithley_ip_address
+    print("Connecting to Keithley at ip address '%s'" % args.keithley_ip_address)
+    print("To change this IP address either edit ~/.keithley_ip_address.txt or remove that file and you will be prompted next time to enter it.")
+
+if args.keithley_model == 2450:
+    mykey = Keithley2450(portname)
+elif args.keithley_model == 3606:
+    mykey = Agilent3606A()
+else:
+    mykey = KeithleyDMM6500(portname)
+    mykey.set_read_V()
 
 asicsConfig0 = deepcopy(asicsConfig)
 cfg = deepcopy(asicsConfig0)
@@ -84,9 +121,16 @@ for portID, slaveID, chipID in activeAsics:
         daqd.setAsicsConfig(cfg)
         sleep(0.1)
         
-        #(_, voltage) = mykey.meas_V()
-        voltage = mykey.read()
-        print "ALDO off   I: %f uA" % (float(voltage)*1E06/10.)
+	if args.keithley_model == 2450:
+	    # FIXME: Would be much nicer to have a consistent interface between
+	    # the two keithley models so we don't have to have this if
+	    # statement here.
+	    _, voltage = mykey.meas_V()
+	elif args.keithley_model == 3606:
+	    voltage = mykey.meas_V()
+	else:
+	    voltage = mykey.read()
+        print("ALDO off   I: %f uA" % (float(voltage)*1E06/10.))
 
 
 #--------------
@@ -133,12 +177,16 @@ for portID, slaveID, chipID in activeAsics:
                 it = 0
                 for _ in range(0, nMeas):
                     sleep(1)
-                    #(_, thisVolt) = mykey.meas_V()
-                    thisVolt = mykey.read()
+		    if args.keithley_model == 2450:
+			_, thisVolt = mykey.meas_V()
+	            elif args.keithley_model == 3606:
+	                thisVolt = mykey.meas_V()
+		    else:
+			thisVolt = mykey.read()
                     thisVolt = abs(thisVolt)
                     thisCurr = float(thisVolt)*1E06/10.
-                    if verbose:
-                        print ("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*thisVolt,thisCurr))
+                    if args.verbose:
+                        print("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*thisVolt,thisCurr))
                         #print ("dac: %3d   V_set: %6.3f V   V_meas: %f V" % (int(dac),volt,thisVolt))
                     g_I.SetPoint(g_I.GetN(),g_I.GetN(),thisCurr)
                     #g_IV.SetPoint(g_IV.GetN(),g_IV.GetN(),thisVolt)
@@ -183,7 +231,7 @@ for point in range(1, g_IV.GetN()):
         y2 = g_IV.GetPointY(point)
         g_dlogIdV.SetPoint(g_dlogIdV.GetN(),0.5*(x1+x2),(math.log(y2)-math.log(y1))/(x2-x1))
 
-if verbose:
+if args.verbose:
     c1 = ROOT.TCanvas("c1","c1",500,500)
     g_I.SetTitle("I vs i measurement;i measurement;current")
     g_I.Draw("APL")

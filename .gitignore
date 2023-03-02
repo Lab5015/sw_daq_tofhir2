@@ -5,4 +5,12 @@
 *.cpp.b
 *.so
 *_C.d
-
+build
+*.swp
+*.bins
+*.idxf
+*.modf
+*.rawf
+*.trim
+*.root
+*.png

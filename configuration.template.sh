@@ -4,6 +4,8 @@ CONFIG_FILE=${DATA_DIR}/config.ini
 
 set -e
 
+mkdir -p ${DATA_DIR}
+
 ./acquire_threshold_calibration --config ${CONFIG_FILE} -o ${DATA_DIR}/disc_calibration
 ./process_threshold_calibration --config ${CONFIG_FILE} -i  ${DATA_DIR}/disc_calibration -o ${DATA_DIR}/disc_calibration.tsv --root-file ${DATA_DIR}/disc_calibration.root
  

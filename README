@@ -1,0 +1,128 @@
+TOFHIR2 Data Taking Instructions
+================================
+
+This repository contains code to calibrate and take data from TOFHIR2 chips.
+This README has instructions for how to install, calibrate, and take data.
+
+Installation
+------------
+
+    $ cd
+    $ mkdir tofhir
+    $ git clone https://github.com/Lab5015/sw_daq_tofhir2.git
+    $ git clone https://github.com/Lab5015/Lab5015Utils.git
+    $ sudo pip install minimalmodbus==1.0.1
+    $ sudo pip install simple-pid
+    $ git clone https://github.com/Lab5015/Lab5015Analysis.git
+    $ cd sw_daq_tofhir2
+    $ mkdir build
+    $ cd build
+    $ cmake ..
+    $ make -j4
+
+Running
+-------
+
+First, we need to start the daq daemon. Make sure you have all the correct
+power to the FEB/D.
+
+    $ cd ~/tofhir/sw_daq_tofhir2/build
+    $ rm /tmp/d.sock
+    $ rm /dev/shm/daqd_shm
+    $ ./daqd --socket-name /tmp/d.sock --daq-type GBE
+
+You should see the following output
+
+    Size of frame is 16384
+    Got FPGA reply
+    FrameServer::startWorker called...
+    FrameServer::startWorker exiting...
+    UDPFrameServer::runWorker starting...
+
+This command will continue running the whole time you are communicating with
+the FEB/D and/or TOFHIR. So now you should open a new terminal. Now, we can try
+to initialize the system:
+
+    $ cd ~/tofhir/sw_daq_tofhir2/build
+    $ python set_system_mode.py --mode tofhir2x
+
+or, if you are running with a TOFHIR2B:
+
+    $ python set_system_mode.py --mode tofhir2b
+
+Now, we can initialize the system:
+
+    $ ./init_system
+
+With one active ASIC connected, you should see the following:
+
+    INFO: active units on ports:  0
+    INFO: TGR unit is ( 0,  0)
+    INFO: FEB/D ( 0,  0) has  1 active ASICs: 0
+
+Now, we start the QDC, TDC, and threshold calibrations:
+
+    $ cd ~/tofhir/sw_daq_tofhir2/build
+    $ ./make_bias_calibration_table -o ../config/bias_calibration.tsv
+    $ ./make_simple_bias_settings_table --config ../config/config.ini --offset 0.0 --prebd 30 --bd 38.5 --over 3.5 -o ../config/bias_settings.tsv
+    $ sh ../configuration.template.sh ../config
+
+You should now see the following calibration files in the config directory:
+
+    bias_calibration.tsv           qdc_calibration.idxf
+    bias_settings.tsv              qdc_calibration.modf
+    config.ini                     qdc_calibration.rawf
+    disc_calibration_00_00_00.pdf  qdc_calibration.trim
+    disc_calibration_baseline.tsv  qdc_calibration.tsv
+    disc_calibration_dark.tsv      tdc_calibration_00_00_00.pdf
+    disc_calibration_noise.tsv     tdc_calibration_00_00_00.png
+    disc_calibration.root          tdc_calibration_00_00_00.root
+    disc_calibration.tsv           tdc_calibration.bins
+    disc_settings.tsv              tdc_calibration.idxf
+    qdc_calibration_00_00_00.pdf   tdc_calibration.modf
+    qdc_calibration_00_00_00.png   tdc_calibration.rawf
+    qdc_calibration_00_00_00.root  tdc_calibration.tsv
+    qdc_calibration.bins
+
+Next we do the ALDO calibrations. Run the following commands and physically
+connect the mutlimeter to the outputs of ALDO A and B as directed by the
+terminal output. Note that the IP address will depend on your specific setup;
+you can find it on a Keithley 2450 under MENU:Communication:IP Adress
+
+    $ cd ~/tofhir/sw_daq_tofhir2/build
+    $ ./scan_aldo_hv --config ../config/config.ini -o aldo_scan --keithley-model 2450 --keithley-ip-address 10.168.233.197
+    $ ./create_ALDO_calibration_combined.py aldo_scan_ASIC*tsv --dest-dir ../config
+
+scan_aldo_hv creates two tsv files for each ALDO in the current directory, and
+create_ALDO_calibration_combined combines tsv files to include all active ASICs
+and place the resulting files in dest-dir.
+
+Next we apply a constant bias to the SiPMs and observe the current. If you are
+injecting light with a laser, this can be used to estimate the number of pe.
+Connect the multimeter to measure voltage across the SiPM current measurement
+resistors for ALDO A and B in turn.
+
+    $ ./acquire_sipm_stressTest --config ../config/config.ini --bv 42 --ch 0 --time 10 --label test --asic 0 --aldoA --keithley-model 2450 --verbose
+    $ ./acquire_sipm_stressTest --config ../config/config.ini --bv 42 --ch 0 --time 10 --label test --asic 0 --aldoB --keithley-model 2450 --verbose
+ 
+To run an IV scan to determine the breakdown voltage of the SiPMs you can run
+the following commands. You will need to connect the multimeter to read across
+the SiPM current measurement resistors as before, and you may need to expose
+the SiPMs to light to get enough current:
+
+    $ ./acquire_sipm_IV_scan --config ../config/config.ini --aldo A --keithley-model 2450 --verbose --bvMin 36 --bvMax 39
+    $ ./acquire_sipm_IV_scan --config ../config/config.ini --aldo B --keithley-model 2450 --verbose --bvMin 36 --bvMax 39
+
+Based on the observed breakdown voltage, you can update ~/tofhir/sw_daq_tofhir2/config/bias_settings_aldo.tsv.
+
+We are now ready to take data. The following command will acquire data for one
+second at OV=3.5V while self-triggering on ith1:
+
+    $ python acquire_sipm_data_scan --config ../config/config.ini --time 1 --ith1 10 --ith2 1 --ithe 1 --ov 3.5 --trigger none --aldo --data-dir ../../data
+
+The data will be stored in the specified data directory, and the run number
+will be incremented automatically. You can then convert the data into a ttree
+with the following command. Note that the run number and data directory should
+be updated as needed.
+
+    $ python convert.py --config ../config/config.ini -r run0001 --mode e --data-dir ../../data/

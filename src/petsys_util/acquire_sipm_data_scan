@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
+from __future__ import print_function
 from petsys import daqd, config
 from copy import deepcopy
 from time import sleep
 import argparse
 import os
 import pprint
-
 
 def get_list(input_list):
         vals = []
@@ -20,7 +18,6 @@ def get_list(input_list):
                 else:
                         vals.append(float(hyphen_list[0]))
         return vals
-
 
 parser = argparse.ArgumentParser(description='Acquire SiPM data')
 parser.add_argument("--config", type=str, required=True, help="Configuration file")
@@ -47,11 +44,19 @@ parser.add_argument("--l1", dest="l1", action="store_true", help="Enable the L1 
 parser.add_argument("--enable-channels", dest="enChannels", required=False, help="comma separated vector of enabled channels")
 parser.add_argument("--fix-channels", dest="fixChannels", required=False, help="comma separated vector of channels for which ith1 is fixed at 30")
 parser.add_argument("--wait", dest="wait", action="store_true", help="wait 60 sec. before starting the run")
-
+parser.add_argument("--data-dir", default="/storage/TOFHIR2", help="Directory to store raw and reco data")
 
 #------------------------
 # parsing input arguments
 args = parser.parse_args()
+
+if not os.path.exists(args.data_dir):
+	print("Error: data directory '%s' does not exist!" % args.data_dir)
+	print("Please rerun with --data-dir specifying where output data is")
+	sys.exit(1)
+
+os.system('mkdir -p %s' % os.path.join(args.data_dir,"raw"))
+os.system('mkdir -p %s' % os.path.join(args.data_dir,"reco"))
 
 ith1_list = get_list(args.ith1)
 ith2_list = get_list(args.ith2)
@@ -70,25 +75,34 @@ if( args.fixChannels ):
 
 run = -1
 if not args.fileNamePrefix:
-        with open('/storage/TOFHIR2/last_run') as f:
+	last_run_file = os.path.join(args.data_dir,"last_run")
+	if not os.path.exists(last_run_file):
+		print("Last run file '%s' does not exist. Should I create it [y/n]?" % last_run_file)
+		answer = raw_input()
+		if answer.lower() == 'y':
+			with open(last_run_file,"w") as f:
+				f.write("0\n")
+		else:
+			print("Quitting...")
+			sys.exit(0)
+        with open(last_run_file) as f:
                 runs = [int(x) for x in next(f).split()]
                 run = str(runs[0]+1)
-                os.remove('/storage/TOFHIR2/last_run')
-                with open('/storage/TOFHIR2/last_run','w+') as f:
+                os.remove(last_run_file)
+                with open(last_run_file,'w+') as f:
                         f.write(run)
-        args.fileNamePrefix = "/storage/TOFHIR2/raw/run%04d" % (int(run))
+        args.fileNamePrefix = os.path.join(args.data_dir,"raw/run%04d" % (int(run)))
 else:
         run = args.fileNamePrefix
 
 
 #---------------------
 # copy the config file
-os.system('cp %s /storage/TOFHIR2/raw/config_run%s.ini'%(args.config,str(run)))
-configCopy = open('/storage/TOFHIR2/raw/config_run%s.ini'%str(run), 'a')
-configCopy.write(pprint.pformat(args))
-configCopy.write('\n')
-configCopy.close()
-
+new_config_file = os.path.join(args.data_dir, "raw", "config_run%s.ini" % str(run))
+os.system('cp %s %s' % (args.config,new_config_file))
+with open(new_config_file, 'a') as configCopy:
+	configCopy.write(pprint.pformat(args))
+	configCopy.write('\n')
 
 #-----------------------------
 # load configuration from file
@@ -106,17 +120,17 @@ asicsConfig = daqd.getAsicsConfig()
 activeAsics = daqd.getActiveAsics()
 
 if len(activeAsics) == 0:
-        print "no active ASICs found. Exiting..."
+        print("no active ASICs found. Exiting...")
         exit()
 else:
-        print "active ASICs found: "
-        print activeAsics
+        print("active ASICs found: ")
+        print(activeAsics)
 
 
 #--------------
 # trigger modes
 if args.trigger == "none":
-        print "### self-triggering mode ###"
+        print("### self-triggering mode ###")
 if args.trigger == "int":
         # Enable INTERNAL triggers from FEB/D to J15
         daqd.write_config_register_tgr(8, 0x21A, 0x81)
@@ -240,13 +254,13 @@ for ith1 in ith1_list:
 
 
                                                 if channelID == 0:
-                                                        print("%d %d %d %d : %d,%d,%d") % (portID,slaveID,chipID,channelID,dac_setting_ith1,dac_setting_ith2,dac_setting_ithe)
+                                                        print(("%d %d %d %d : %d,%d,%d") % (portID,slaveID,chipID,channelID,dac_setting_ith1,dac_setting_ith2,dac_setting_ithe))
                                 
                                 if( args.fixChannels ):
                                         for ac in cfg.values():
                                                 for ch in args.fixChannels:
                                                         
-                                                        print "fixing channel %d" % int(ch)
+                                                        print("fixing channel %d" % int(ch))
                                                                                                                 
                                                         #cc.setValue("cfg_a3_ith_t1", 10)
                                                         #cc.setValue("cfg_a3_ith_t2", 10)
@@ -288,10 +302,10 @@ for ith1 in ith1_list:
                                 if args.wait:
                                         sleep(60.)
                                         args.wait = False
-                                print "ov: %3.1f,   ith1: %2d,   ith2: %2d,   ithe: %2d" % (float(ov), int(ith1), int(ith2), int(ithe))
-                                print ">>> t1: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t1"))
-                                print ">>> t2: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t2"))
-                                print ">>> e: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_e"))
+                                print("ov: %3.1f,   ith1: %2d,   ith2: %2d,   ithe: %2d" % (float(ov), int(ith1), int(ith2), int(ithe)))
+                                print(">>> t1: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t1")))
+                                print(">>> t2: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t2")))
+                                print(">>> e: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_e")))
                                 daqd.acquire(args.time, float(ov), 10000*(int(ith1)+1)+100*(int(ith2)+1)+int(ithe)+1)
                                         
 
