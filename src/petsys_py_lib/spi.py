@@ -16,8 +16,17 @@ def tmp126_ll(conn, portID, slaveID, chipID, data_out):
 		padding + data_out + padding)
 
 def tmp126_read(conn, portID, slaveID, chipID):
-	data = [ 0b00000001, 0x00, 0x00, 0x00 ]
+	# Read the Device ID register to see if we can talk to the chip
+	data = [ 0x01, 0x0C, 0x00, 0x00]
+	r = tmp126_ll(conn, portID, slaveID, chipID, data)
+	#print [ "%02x" % x for x in r ]
+	if (r[3] != 0x21) or (r[4] != 0x26):
+		return r[3:4], float("nan")
 
+
+
+	# Read the temperature register
+	data = [ 0x01, 0x00, 0x00, 0x00 ]
 	r = tmp126_ll(conn, portID, slaveID, chipID, data)
 	#print [ "%02x" % x for x in r ]
 	u = r[3] << 8 | r[4]
