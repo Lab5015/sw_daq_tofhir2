@@ -1,5 +1,29 @@
 import time
 
+def tmp126_ll(conn, portID, slaveID, chipID, data_out):
+	p = 2
+	padding = [ 0xFF for n in range(p) ]
+	p = 8 * p
+	w = len(data_out) * 8
+
+	# Pad the cycle with zeros
+	return conn.spi_master_execute(portID, slaveID, 0x02, chipID,
+		p+w+p,          # cycle
+		p-0,p+w+0,          # sclk en
+		p-1,p+w+1,      # cs
+		0, p+w+p,       # mosi
+		p,p+w,
+		padding + data_out + padding)
+
+def tmp126_read(conn, portID, slaveID, chipID):
+	data = [ 0b00000001, 0x00, 0x00, 0x00 ]
+
+	r = tmp126_ll(conn, portID, slaveID, chipID, data)
+	#print [ "%02x" % x for x in r ]
+	u = r[3] << 8 | r[4]
+	u = u >> 2
+	return u * 0.03125
+
 def spi_reg_ll(conn, portID, slaveID, chipID, data_out):
 	p = 2
 	padding = [ 0xFF for n in range(p) ]
