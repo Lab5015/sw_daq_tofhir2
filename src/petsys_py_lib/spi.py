@@ -21,7 +21,7 @@ def tmp126_read(conn, portID, slaveID, chipID):
 	r = tmp126_ll(conn, portID, slaveID, chipID, data)
 	#print [ "%02x" % x for x in r ]
 	if (r[3] != 0x21) or (r[4] != 0x26):
-		return r[3:4], float("nan")
+		return float("nan")
 
 
 
