@@ -50,6 +50,29 @@ class Tester(object):
 			# Enable injector power
 			self.__cfg |= (0b1 << 34)
 			spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+			
+			
+	def set_uut_on(self, a, on):
+		mask = 0b1 << (6+a)
+		if on:
+			self.__cfg |= mask
+		else:
+			self.__cfg  &= (~mask)
+		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+		
+		
+	def get_uut_on(self, a):
+		mask = 0b1 << (6+a)
+		return (self.__cfg & mask) != 0
+		
+		
+	def set_uut_reset_n(self, a, v):
+		mask = 0b1 << (8+a)
+		if v:
+			self.__cfg |= mask
+		else:
+			self.__cfg  &= (~mask)
+		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 				
 
 	def __adc_read(self, chip_id, channel_id):
@@ -75,13 +98,32 @@ class Tester(object):
 		adc_map = { 0: 4, 1: 3 }
 		return 0.5 * self.__adc_read(0x5, adc_map[k])
 
+	def set_uut_vfuse(self,  on):
+		mask = 0b1 << 18
+		if on:
+			self.__cfg |= mask
+		else:
+			self.__cfg &= ~mask
+		
+		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+
 	def get_uut_vbg(self, k):
 		return self.__adc_read(0x3 + k, 0)
+
+	def get_uut_valdo(self, k, aOrB):
+		return self.__adc_read(0x3 + k, 2 + aOrB)
 
 	def set_leds(self, k, value):
 		mask = 0b111 << 3*k
 		self.__cfg &= ~mask
 		self.__cfg |= value << (3*k)
+		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+		
+		
+	def set_uut_board_id(self, board_id):
+		mask = 0b1111 << 10
+		self.__cfg /= ~mask
+		self.__cfg |= (board_id << 10)
 		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 
 

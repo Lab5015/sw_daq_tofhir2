@@ -1,6 +1,6 @@
 import time
 
-def tmp126_ll(conn, portID, slaveID, chipID, data_out):
+def tmp126_ll(conn, portID, slaveID, chipID, data):
 	p = 2
 	padding = [ 0xFF for n in range(p) ]
 	p = 8 * p
@@ -9,7 +9,7 @@ def tmp126_ll(conn, portID, slaveID, chipID, data_out):
 	# Pad the cycle with zeros
 	return conn.spi_master_execute(portID, slaveID, 0x02, chipID,
 		p+w+p,          # cycle
-		p-0,p+w+0,          # sclk en
+		p,p+w,          # sclk en
 		p-1,p+w+1,      # cs
 		0, p+w+p,       # mosi
 		p,p+w,

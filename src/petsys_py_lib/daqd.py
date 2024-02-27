@@ -400,7 +400,7 @@ class Connection(object):
 			for chipID in range(16):
 				busID = chipID / 2
 				chipID = chipID % 2
-				self.__tofhir2_cmd(portID, slaveID, busID, chipID, 33, True, False, gctx)
+				self.__tofhir2_cmd(portID, slaveID, busID, chipID, 2*busID+chipID, 33, True, False, gctx)
 		
 		
 		#
@@ -940,10 +940,10 @@ class Connection(object):
 		return None
 
 
-	def __tofhir2_cmd(self, portID, slaveID, busID, chipID, regID, write, expect_reply, value):
-		return self.__tofhir2_cmd_ll(portID, slaveID, busID, chipID, regID, write, expect_reply, value)
+	def __tofhir2_cmd(self, portID, slaveID, busID, chipID, readID, regID, write, expect_reply, value):
+		return self.__tofhir2_cmd_ll(portID, slaveID, busID, chipID, readID, regID, write, expect_reply, value)
 
-	def __tofhir2_cmd_ll(self, portID, slaveID, busID, chipID, regID, write, expect_reply, value):
+	def __tofhir2_cmd_ll(self, portID, slaveID, busID, chipID, readID, regID, write, expect_reply, value):
 
 		l = len(value)
 		payload = bitarray(256)
@@ -955,7 +955,7 @@ class Connection(object):
 		
 		composed_command =  bytearray([ 
 				busID, 
-				expect_reply and 0x1 or 0x0,
+				(expect_reply and 0x80 or 0x00) | readID,
 				0x00,
 				0x2F, 0xAF, 0xC1,
 				chipID,
@@ -1025,12 +1025,14 @@ class Connection(object):
 					raise e
 
 
-	def ___doAsicCommand(self, portID, slaveID, asicID, command, value=None, channel=None):
+	def ___doAsicCommand(self, portID, slaveID, asicID, command, value=None, channel=None, readID=None):
 		busID = asicID / 2
 		lChipID = asicID % 2
+		if not readID: readID = 2*busID + lChipID
+
 		
 		if command == "wrGlobalCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 32, True, True, value)
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 32, True, True, value)
 			# Check write with readback
 			readStatus, readValue = self.__doAsicCommand(portID, slaveID, asicID, "rdGlobalCfg")
 			if readValue !=  value:
@@ -1039,11 +1041,11 @@ class Connection(object):
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 
 		elif command == "rdGlobalCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 32, False, True, self.__asic_module.AsicGlobalConfig())
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 32, False, True, self.__asic_module.AsicGlobalConfig())
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 
 		elif command == "wrChCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, channel, True, True, value)
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, channel, True, True, value)
 			# Check write with readback
 			readStatus, readValue = self.__doAsicCommand(portID, slaveID, asicID, "rdChCfg", channel=channel)
 			if readValue !=  value:
@@ -1052,16 +1054,16 @@ class Connection(object):
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 
 		elif command == "rdChCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, channel, False, True, self.__asic_module.AsicChannelConfig())
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, channel, False, True, self.__asic_module.AsicChannelConfig())
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 		
 		elif command == "rdStatus":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 34, False, True, self.__asic_module.AsicGlobalConfigStatus())
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 34, False, True, self.__asic_module.AsicGlobalConfigStatus())
 			return status, self.__asic_module.AsicGlobalConfigStatus(reply)
 		
 		elif command == "efuse_load":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 35, True, False, bitarray(254))
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 36, True, False, bitarray(254))
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 35, True, False, bitarray(254))
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 36, True, False, bitarray(254))
 			return status, []
 		
 		

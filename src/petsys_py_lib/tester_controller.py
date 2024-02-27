@@ -45,13 +45,12 @@ class Connection(daqd.Connection):
 		elif (mask & 0b10) == 0:
 			# Power to Testers only
 			# Disable 44 V and TEC source if enabled, leave only tester power
-			print("tester power only")
+
 			for portID, slaveID in self.getActiveFEBDs():
 				pwr_en = 0b01
 				self.write_config_register(portID, slaveID, 8, 0x0213, pwr_en)
 
-			self.__identify_testers()
-			for key, tester in sorted(self.__testers.items()):
+			for key, tester in self.get_testers().items():
 				tester.set_uut_power(False)
 		else:
 			# Ensure low voltage on for Testers
@@ -61,10 +60,8 @@ class Connection(daqd.Connection):
 				self.write_config_register(portID, slaveID, 8, 0x0213, pwr_en)
 			time.sleep(0.2)
 			
-			self.__identify_testers()
-
 			try:
-				for key, tester in sorted(self.__testers.items()):
+				for key, tester in self.get_testers().items():
 					# Enable power to UUTs and perform basic power checks
 					tester.set_uut_power(True)
 			except tester_common.TesterPowerException as e:
@@ -78,13 +75,6 @@ class Connection(daqd.Connection):
 				self.write_config_register(portID, slaveID, 8, 0x0213, 0b0101)
 		
 
-	def set_fe_power(self, on):
-		if not on:
-			self.set_fe_power_all(0b01)
-		else:
-			self.set_fe_power_all(0b11)
-			
-			
 	def set_tec_power(self, on):
 		for portID, slaveID in self.getActiveFEBDs():
 			pwr_en =  self.read_config_register(portID, slaveID, 8, 0x0213)
@@ -101,5 +91,7 @@ class Connection(daqd.Connection):
 
 
 	def get_testers(self):
+		if self.__testers == {}:
+			self.__identify_testers()
 		return self.__testers
 

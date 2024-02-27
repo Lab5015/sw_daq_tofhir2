@@ -43,6 +43,7 @@ configure_file("src/petsys_py_lib/tester_common.py" "petsys/tester_common.py" CO
 configure_file("src/petsys_py_lib/tester_controller.py" "petsys/tester_controller.py" COPYONLY)
 configure_file("src/petsys_py_lib/fe_tester.py" "petsys/fe_tester.py" COPYONLY)
 configure_file("src/petsys_py_lib/bga_tester.py" "petsys/bga_tester.py" COPYONLY)
+configure_file("src/petsys_util/plot_fetp_calibration.cc" "plot_fetp_calibration.cc" COPYONLY)
 configure_file("src/petsys_py_lib/bitarray_utils.py" "petsys/bitarray_utils.py" COPYONLY)
 configure_file("src/petsys_py_lib/config.py" "petsys/config.py" COPYONLY)
 configure_file("src/petsys_py_lib/spi.py" "petsys/spi.py" COPYONLY)
@@ -83,6 +84,7 @@ configure_file("src/gui/start_gui" "start_gui" COPYONLY)
 configure_file("src/petsys_util/tester_set_uut_power" "tester_set_uut_power" COPYONLY)
 configure_file("src/petsys_util/tester_read_dc" "tester_read_dc" COPYONLY)
 configure_file("src/petsys_util/tester_scan_aldo" "tester_scan_aldo" COPYONLY)
+configure_file("src/petsys_util/bga_test" "bga_test" COPYONLY)
 configure_file("src/petsys_util/acquire_exttp_calibration" "acquire_exttp_calibration" COPYONLY)
 
 
