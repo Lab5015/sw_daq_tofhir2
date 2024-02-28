@@ -13,7 +13,6 @@ import bitarray
 import os
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import termios
 
 
@@ -662,16 +661,11 @@ def check_aldo(sockets, ddir):
 				aldo_dac = df2["aldo_dac"]
 				vout = df2["vout"]
 				
-				#fig, ax = plt.subplots()
-				#ax.plot(aldo_dac, vout)
 				
 				lower = min(vout)
 				upper = max(vout)
 				slope, b = np.polyfit(aldo_dac, vout, 1)
 				
-				#ax.plot(aldo_dac, aldo_dac * slope + b, linewidth=2.0)
-				#plt.show()
-
 				error = vout - (slope * aldo_dac + b)
 				
 				if aldo_gain == 0:
