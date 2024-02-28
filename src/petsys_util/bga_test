@@ -32,7 +32,7 @@ def main(argv):
 		sys.stderr.write("Invalid answer.\n")
 		return 1
 
-	#os.mkdir(args.o)
+	os.mkdir(args.o)
 
 	conn = tester_controller.Connection()
 	# Reset the aux MMCM
@@ -229,19 +229,19 @@ def main(argv):
 	extp_att = 4
 	assert extp_att in qdc_att_list
 
-	#os.system("cp ../config.ini %(ddir)s" % locals())
-	#os.system("./make_simple_channel_map -o %(ddir)s/map --port 0 --slave 0 --trigger-port 0" % locals())
-	#os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % ddir)
-	## Acqquire data
-	#os.system("./acquire_threshold_calibration --no-bias --config /dev/null -o %(ddir)s/disc_calibration" % locals())
-	#os.system("./acquire_tdc_calibration --config /dev/null -o %(ddir)s/tdc_calibration" % locals())
-	#for att in qdc_att_list:
-		#os.system("./acquire_qdc_calibration --config /dev/null -o %(ddir)s/qdc_calibration --att %(att)d" % locals())
+	os.system("cp ../config.ini %(ddir)s" % locals())
+	os.system("./make_simple_channel_map -o %(ddir)s/map --port 0 --slave 0 --trigger-port 0" % locals())
+	os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % ddir)
+	# Acqquire data
+	os.system("./acquire_threshold_calibration --no-bias --config /dev/null -o %(ddir)s/disc_calibration" % locals())
+	os.system("./acquire_tdc_calibration --config /dev/null -o %(ddir)s/tdc_calibration" % locals())
+	for att in qdc_att_list:
+		os.system("./acquire_qdc_calibration --config /dev/null -o %(ddir)s/qdc_calibration --att %(att)d" % locals())
 	
-	#conn.initializeSystem()
-	#acquire_extp(conn, sockets, ddir, extp_att)
-	#acquire_fetp(conn, sockets, ddir, extp_att)
-	#acquire_aldo(conn, sockets, ddir)
+	conn.initializeSystem()
+	acquire_extp(conn, sockets, ddir, extp_att)
+	acquire_fetp(conn, sockets, ddir, extp_att)
+	acquire_aldo(conn, sockets, ddir)
 
 
 	conn.set_fe_power_all(0b01)	# Disable power to UUT
