@@ -156,7 +156,11 @@ def main(argv):
                                         continue
 
                                 # create dataframe with one line per phase/tacID configuration and columns for integration time and count/sum operations
-                                ch_res = df.loc[c+32*(a+64*(s+32*p))].unstack(level=['int_t','oper'])
+				try:
+	                                ch_res = df.loc[c+32*(a+64*(s+32*p))].unstack(level=['int_t','oper'])
+				except KeyError:
+					channel_trimmed[(p,s,a,c)] = True
+					continue
 
                                 # stopping conditions
                                 if len(ch_res[ (ch_res[largeWindow,'len']<10) |
