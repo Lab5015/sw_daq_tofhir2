@@ -14,6 +14,7 @@ import os
 import pandas as pd
 import numpy as np
 import termios
+import tempfile
 
 
 def main(argv):
@@ -727,7 +728,8 @@ def check_discriminators(sockets, ddir):
 	
 	
 def check_tdc(sockets, ddir):
-	os.system("./process_tdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/tdc_calibration -o %(ddir)s/tdc_calibration" % locals())	
+	tmp_dir = tempfile.mkdtemp(suffix="tofhir_bga")
+	os.system("./process_tdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/tdc_calibration -o %(ddir)s/tdc_calibration --tmp-prefix %(tmp_dir)s" % locals())	
 
 	df = pd.read_csv("%(ddir)s/tdc_calibration.tsv" % locals(), sep="\t", header=None, comment="#",
 		names=["port_id", "slave_id", "asic_id", "channel_id", 	"tac_id", "branch_id", "t0", "a0", "a1", "a2", "sigma" ]
@@ -766,12 +768,14 @@ def check_tdc(sockets, ddir):
 					except IndexError as e:
 						results[(t,p,s,m,a)].append("TDC CH %d TAC %d BRANCH %d MISSING" % (ch, tac_id, branch_id))
 						continue
-			
+
+	os.system("rm -rf %(tmp_dir)s" % locals())
 	return results
 	
 	
 def check_qdc(sockets, ddir, att):
-	os.system("./process_qdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/qdc_calibration%(att)d -o %(ddir)s/qdc_calibration%(att)d" % locals())	
+	tmp_dir = tempfile.mkdtemp(suffix="tofhir_bga")
+	os.system("./process_qdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/qdc_calibration%(att)d -o %(ddir)s/qdc_calibration%(att)d --tmp-prefix %(tmp_dir)s" % locals())	
 
 	df = pd.read_csv("%(ddir)s/qdc_calibration%(att)d.tsv" % locals(), sep="\t", header=None, comment="#",
 		names=["port_id", "slave_id", "asic_id", "channel_id", 	"tac_id", "trim", "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "xx", "sigma" ]
@@ -800,6 +804,8 @@ def check_qdc(sockets, ddir, att):
 				except IndexError as e:
 					results[(t,p,s,m,a)].append("QDC CH %d TAC %d MISSING" % (ch, tac_id))
 					continue
+
+	os.system("rm -rf %(tmp_dir)s" % locals())
 	return results	
 	
 	
