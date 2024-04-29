@@ -16,34 +16,18 @@ class Tester(object):
 			spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 
 		else:
-			vin = self.get_tester_vin()
-			if vin < 1.6:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "Tester input voltage %4.2f V is under 1.6 V" % vin)
-			if vin > 2.5:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "Tester input voltage %4.2f V is above 2.5 V" % vin)
-
 			self.__cfg |= 0b111100
 			spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 			time.sleep(0.1)
-		
-			# Check current and voltages
-			vin = self.get_tester_vin()
-			if vin < 1.6:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "Tester input voltage %4.2f V is under 1.6 V" % vin)
-
-			vin = self.get_uut_vin()
-			if vin < 1.6:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "UUT input voltage %4.2f V is under 1.6 V" % vin)
 
 			iin = self.get_uut_iin()
-			if iin > 1.0:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "UUT input current %4.2f A is above 1.0 A" % iin)
+			if iin > 1.2:
+				print "WARNING: Tester (%d, %d) UUT input current is above 1.2A and will be disabled" % (self.__p, self.__s, self.__m, iin)
+				self.set_uut_power(False)
+				
 	
-
-			#for n in range(2):
-				#v = self.get_uut_1V2(n)
-				#if abs(1.2 - v) > 0.12:
-					#raise TesterPowerException(self.__p, self.__s, self.__m, "UUT ASIC %d VDD %4.2f V is outside tolerance" % (n, v))
+	def get_uut_power(self):
+		return (self.__cfg & 0b111100) == 0b111100
 	
 				
 

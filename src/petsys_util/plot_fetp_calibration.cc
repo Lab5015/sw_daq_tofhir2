@@ -9,7 +9,7 @@ using namespace std;
 void plot_fetp_calibration(string filePrefix, int th)
 {
   auto data = new TChain("data","data");
-  data->Add((filePrefix+"_scan.root").c_str());
+  data->Add((filePrefix+".root").c_str());
 
   float step1, step2, tot, energy;
   Long64_t time;

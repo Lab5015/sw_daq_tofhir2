@@ -9,39 +9,30 @@ class Tester(object):
 		self.__s = s
 		self.__m = m
 		self.__cfg = 0x0
+		#self.__cfg |= (0b0111 << 14) # Set RX mode to FALLING
+		self.__cfg |= (0b1111 << 14) # Set RX mode to AUTO
+		
+		spi.adc7738_calibrate(conn, p, s, 0x10*(m+1) + 0x3)
+		spi.adc7738_calibrate(conn, p, s, 0x10*(m+1) + 0x4)
+
 
 	def set_uut_power(self, on):
 		if not on:
 			# Disable everything except the LEDs
-			self.__cfg &= 0b111111
-			spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+			for k in range(2):
+				self.set_uut_on(k, False)
 
 		else:
-			vin = self.get_tester_vin()
-			if vin < 1.6:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "Tester input voltage %4.2f V is under 1.6 V" % vin)
-			if vin > 2.5:
-				raise TesterPowerException(self.__p, self.__s, self.__m, "Tester input voltage %4.2f V is above 2.5 V" % vin)
-
-
 			# Enable ASICs, one at a time
 			for k in range(2):
-				mask = 0b1 << (6+k)
-				self.__cfg |= mask
-				spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+				self.set_uut_on(k, True)
 
 				iin = self.get_uut_iin(k)
-				if iin > 0.5:
-					#raise TesterPowerException(self.__p, self.__s, self.__m, "ASIC %d input current %4.2f is above 0.5 A" % (k, iin))
-					print "WARNING: Tester (%d, %d, %d) ASIC %d input current is above 0.5 A and will be disabled" % (self.__p, self.__s, self.__m, k, iin)
-					self.__cfg &= (~mask)
-					spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+				if iin > 0.6:
+					print "WARNING: Tester (%d, %d, %d) ASIC %d input current is above 0.6 A and will be disabled" % (self.__p, self.__s, self.__m, k, iin)
+					self.set_uut_on(k, False)
 					continue
 
-
-				vin = self.get_uut_vin(k)
-				if abs(vin - 1.2) > 0.06:
-					raise TesterPowerException(self.__p, self.__s, self.__m, "ASIC %d input voltage %4.2f is abnormal" % (k, vin))
 
 
 
@@ -50,6 +41,10 @@ class Tester(object):
 			# Enable injector power
 			self.__cfg |= (0b1 << 34)
 			spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
+			
+			
+	def get_uut_power(self):
+		return self.get_uut_on(0) and self.get_uut_on(1)
 			
 			
 	def set_uut_on(self, a, on):
@@ -112,6 +107,12 @@ class Tester(object):
 
 	def get_uut_valdo(self, k, aOrB):
 		return self.__adc_read(0x3 + k, 2 + aOrB)
+	
+	def get_uut_aldo_en(self, k, aOrB):
+		return self.__adc_read(0x3 + k, 4 + aOrB)
+
+	def get_uut_aldo_rg(self, k, aOrB):
+		return self.__adc_read(0x3 + k, 6 + aOrB)
 
 	def set_leds(self, k, value):
 		mask = 0b111 << 3*k
@@ -122,11 +123,16 @@ class Tester(object):
 		
 	def set_uut_board_id(self, board_id):
 		mask = 0b1111 << 10
-		self.__cfg /= ~mask
+		self.__cfg &= ~mask
 		self.__cfg |= (board_id << 10)
 		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
-
-
+		
+		
+	#def set_uut_rx_mode(self, mode):
+		#mask = 0b1111 << 14
+		#self.__cfg &= ~mask
+		#self.__cfg |= (mode << 14)
+		#spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 
 	def injector_disable(self):
 		self.__cfg &= ~0b1111111111111110000000000000000000
@@ -136,7 +142,7 @@ class Tester(object):
 		spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, 0x8000)
 
 
-	def injector_enable(self, channel, amplitude):
+	def injector_enable(self, channel, amplitude, load_only=False):
 		channel = INJECTOR_CHANNEL_MAP[channel]
 
 		mux_a = channel & 0x7
@@ -145,14 +151,16 @@ class Tester(object):
 		# Clear all injector bits
 		self.__cfg &= ~0b1111111111111110000000000000000000
 
-		self.__cfg |= 0b1100 << 19
+		if not load_only:
+			self.__cfg |= 0b1100 << 19
 		self.__cfg |= mux_a << 23
 		self.__cfg |= mux_sel << 26
 		self.__cfg |= mux_sel << 30
 		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 
-		spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 0, amplitude)
-		spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, amplitude)
+		if not load_only:
+			spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 0, amplitude)
+			spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, amplitude)
 
 
 

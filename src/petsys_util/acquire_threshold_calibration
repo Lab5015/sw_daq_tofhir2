@@ -15,6 +15,9 @@ parser.add_argument("-o", type=str, dest="outFilePrefix", required=True, help="D
 parser.add_argument("--nreads-noise", dest="noise_reads", type=int, required=False, default=4)
 parser.add_argument("--nreads-dark", dest="dark_reads", type=int, required=False, default=4)
 parser.add_argument("--no-bias", dest="no_bias", action="store_true", required=False, default=False)
+parser.add_argument("--lsb", type=int, help="Override discriminator range")
+parser.add_argument("--step", type=int, default=1, help="Scan step")
+
 args = parser.parse_args()
 
 if args.no_bias:
@@ -62,6 +65,10 @@ for (portID, slaveID, chipID), ac in asicsConfig.items():
 		cc.setValue("c_count", 0x2)
 		cc.setValue("c_latch_B", 0)
 		
+		if args.lsb is not None:
+			cc.setValue("cfg_a3_range_t1", args.lsb)
+			cc.setValue("cfg_a3_range_t2", args.lsb)
+			cc.setValue("cfg_a3_range_e", args.lsb)
 
 
 ##print "Adjusting baseline"
@@ -138,7 +145,7 @@ noiseProfiles = {}
 for thresholdIndex, thresholdName, baselineName in thresholdList:
 	stdout.write("%6s " % thresholdName); stdout.flush()
 
-	for thresholdValue in range(0,64):
+	for thresholdValue in range(0,64, args.step):
 		for ac in asicsConfig.values():
 			for cc in ac.channelConfig:
 				cc.setValue("cfg_a3_ith_t1", 63)

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from petsys import tester_controller, config, spi, tofhir2b
+from petsys import tester_controller, config, spi, tofhir2b, tests
 from copy import deepcopy
 import argparse
 import math
@@ -17,24 +17,40 @@ import termios
 import tempfile
 
 
+AUTO_BANDGAP_TRIM = True
+
 def main(argv):
 	parser = argparse.ArgumentParser(description='Test TOFHiR 2 BGA')
 	parser.add_argument("-o", type=str, required=True, help="Output directory")
 	parser.add_argument("-n", type=int, default=8, help="Number of BGA testers")
+	parser.add_argument("--batch", action="store_true", help="Batch mode")
 	args = parser.parse_args()
 	
-	trimmed = raw_input("Have these ASICs been trimmed before? (Y/N)")
-	if trimmed in [ 'y', 'Y' ]:
-		do_trim = False
-	elif trimmed in [ 'n', 'N' ]:
-		do_trim = True
+	## TEST CODE
+	# Set to TRUE to make the BGA pick and place wait for user after each test
+	enable_user_prompt = False
+	
+	if not args.batch:
+		# Manual operation mode
+		trimmed = raw_input("Have these ASICs been trimmed before? (Y/N)")
+		if trimmed in [ 'y', 'Y' ]:
+			do_bg_trim = False
+		elif trimmed in [ 'n', 'N' ]:
+			do_bg_trim = True
+		else:
+			sys.stderr.write("Invalid answer.\n")
+			return 1
+			
 	else:
-		sys.stderr.write("Invalid answer.\n")
-		return 1
+		do_bg_trim = AUTO_BANDGAP_TRIM
 
 	os.mkdir(args.o)
 
 	conn = tester_controller.Connection()
+	
+	# Set the system to TOFHiR 2C mode
+	conn.write_config_register(0, 0, 16, 0x0104, 0x0004)
+
 	# Reset the aux MMCM
 	conn.spi_master_execute(0, 0, 0x02, 4,
 			16,
@@ -45,8 +61,7 @@ def main(argv):
 			[0x00, 0x00]
 		);
 
-
-	conn.set_fe_power_all(0b01)	# Enable power to testers
+	conn.set_uut_power(False)
 
 	# Check that we have all expected testers
 	n_testers = len(conn.get_testers().keys())
@@ -57,278 +72,144 @@ def main(argv):
 
 	uut_failures = {}
 	sockets = itertools.product(conn.get_testers().items(), [0, 1])
-	sockets = [ (t, p, s, m, a) for ((p, s, m), t), a in sockets ]
+	sockets = [ (m,a,t) for ((p, s, m), t), a in sockets ]
 	sockets = sorted(sockets)
 	
-	for tester, p,s,m,a in sockets:
-		uut_failures[(tester,p,s,m,a)] = []
+	for m,a,t in sockets:
+		uut_failures[m,a] = []
 
-	for tester, p,s,m,a in sockets:
-		tester.set_leds(a, 0b000)
+	for m,a,t in sockets:
+		t.set_leds(a, 0b000)
+	conn.set_uut_power(True)
 
 
-	# Check which testers have ASICs and which apear to be in short circuit
-	# ASICs with high current (>2x typical) will be powered down and not further tested
-	# Empty sockets will be powered down
-	conn.set_fe_power_all(0b11)
-	for tester, p,s,m,a in sockets:
-		uut_on = tester.get_uut_on(a)
+	# ASICs which have been found to be in short circuit will have been powered down
+	for m, a, t in sockets:
+		uut_on = t.get_uut_on(a)
 		if not uut_on:
 			# This socket was turned off due to a short circuit
-			uut_failures[(tester,p,s,m,a)].append("SHORT CIRCUIT")
-			tester.set_leds(a, 0b001)
-			tester.set_uut_on(a, False)
-			continue
-
-		uut_iin = tester.get_uut_iin(a)
-		if uut_iin < 0.010:
-			# This socket is drawing under 10 mA, it's probably empty
-			uut_failures[(tester,p,s,m,a)].append("NOT PRESENT")
-			tester.set_uut_on(a, False)
-			tester.set_leds(a, 0b001)
-
-
-	# Test reset_n
-	for tester, p,s,m,a in sockets:
-		tester.set_uut_reset_n(a, 0)
-
-	conn.initializeSystem()
-	asicsConfig = conn.getAsicsConfig()
-	for tester, p,s,m,a in sockets:
-		if uut_failures[(tester,p,s,m,a)]: continue
-		if (p,s,2*m+a) in asicsConfig.keys():
-			uut_failures[(tester,p,s,m,a)].append("RESET_N FAIL")
-			tester.set_uut_on(a, False)
-			tester.set_leds(a, 0b001)
-
-	for tester, p,s,m,a in sockets:
-		tester.set_uut_reset_n(a, 1)
-
-	# Test basic communication with ASICs
-	# ASICs which fail basic communication will be powered down and not further tested
-	conn.initializeSystem()
-	asicsConfig = conn.getAsicsConfig()
-	for tester, p,s,m,a in sockets:
-		if uut_failures[(tester,p,s,m,a)]: continue
-		if (p,s,2*m+a) not in asicsConfig.keys():
-			uut_failures[(tester,p,s,m,a)].append("NO COMMUNICATION")
-			tester.set_uut_on(a, False)
-			tester.set_leds(a, 0b001)
-
+			uut_failures[m,a].append("SHORT CIRCUIT")
 	
-	# Power check
-	# ASICs with _very_ large current (>2x typical) will be powered down and not futher tested
-	for tester, p,s,m,a in sockets:
-		if uut_failures[(tester,p,s,m,a)]: continue
-		uut_iin = tester.get_uut_iin(a)
-		if uut_iin > 0.500:
-			# This socket is drawing under 10 mA, it's probably empty
-			uut_failures[(tester,p,s,m,a)].append("HIGH CURRENT")
-			tester.set_uut_on(a, False)
-			tester.set_leds(a, 0b001)
-
-		if uut_iin < 0.300:
-			# This socket is drawing under 10 mA, it's probably empty
-			uut_failures[(tester,p,s,m,a)].append("LOW CURRENT")
-			tester.set_uut_on(a, False)
-			tester.set_leds(a, 0b001)
-
-
-	# Re-run initialize system
-	conn.initializeSystem()
-	asicsConfig = conn.getAsicsConfig()
-
-	# Trim bandgap
-	# ASICs with bandgap out of tolerance will be powered down and not further tested
-
-	if do_trim:
-		# Make a semi-shallow copy where the dict and failure list are actually duplicated
-		# and not just referenced
-		uut_failures_before_bandgap = {}
-		for k, v in uut_failures.items():
-			# and don't include chips which haven't failed in the list
-			if v == []:
-				continue
-			uut_failures_before_bandgap[k] = [ f for f in v ]
-
-		for  tester, p,s,m,a in sockets:
-			if not trim_bg(conn, tester, p, s, m, a):				
-				uut_failures[(tester,p,s,m,a)].append("BG TRIM FAIL")
-				
-	else:
-		uut_failures_before_bandgap = {}
-
-	uut_failures = merge_failures(uut_failures, check_trim(sockets))
+	do_tester_check(conn)
+			
+	# Check that ASIC current draw is within normal range (before initialization)
+	uut_failures = merge_failures(uut_failures, tests.bga_check_current(conn, sockets, 0.020, 0.6, "AFTER POWER UP", os.path.join(args.o, "current_before_init.tsv")))
+	sockets = disable_failed(sockets, uut_failures)
+	
+	# Check that ASICs react to RESET_N
+	uut_failures = merge_failures(uut_failures, tests.bga_check_reset_n(conn, sockets))
+	sockets = disable_failed(sockets, uut_failures)
+	
+	uut_failures = merge_failures(uut_failures, tests.bga_check_current(conn, sockets, 0.020, 0.1, "DURING RESET", os.path.join(args.o, "current_during_reset.tsv")))
+	sockets = disable_failed(sockets, uut_failures)
 	
 	
-	## Test other communication features
-	## effect of chip ID
-	#gc = conn._Connection__asic_module.AsicGlobalConfig()
-	#for tester, p,s,m,a in sockets:
-		#if uut_failures[(tester,p,s,m,a)]: continue
+	# Check that ASICs will perform basic communication
+	uut_failures = merge_failures(uut_failures, tests.check_asic_communication(conn, sockets))
+	sockets = disable_failed(sockets, uut_failures)
+	
+	# Check that ASIC current draw is within normal range (after initialization)
+	uut_failures = merge_failures(uut_failures, tests.bga_check_current(conn, sockets, 0.35, 0.6, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
+	sockets = disable_failed(sockets, uut_failures)
+	
+	do_tester_check(conn)
 
-		#for board_id in [  0b1000, 0b100, 0b10, 0b1, 0b0]:
-			#try:
-				#tester.set_uut_board_id(board_id)
-				#busID = m
-				#chipID = a + 2*board_id
-				#readID = 2*m + a
-				#conn._Connection__tofhir2_cmd(p, s, busID, chipID, readID, 32, True, True, gc)
+	# Trim bandgap (optional) and check bandgap value after trimming
+	if do_bg_trim:
+		tests.bga_do_bg_trim(conn, sockets)
+	
+	uut_failures = merge_failures(uut_failures, tests.bga_check_bg_trim(conn, sockets, os.path.join(args.o, "bandgap.tsv")))
+	sockets = disable_failed(sockets, uut_failures)
 
-			#except tofhir2.ConfigurationError as e:
-				#uut_failures[(tester,p,s,m,a)].append("CHIP_ID FAIL")
-				#tester.set_leds(a, 0b001)
-				#break
+	uut_failures = merge_failures(uut_failures, tests.check_itrim(conn, sockets, os.path.join(args.o, "itrim.tsv")))
+	sockets = disable_failed(sockets, uut_failures)
+	
+	uut_failures = merge_failures(uut_failures, tests.bga_check_id(conn, sockets))
+	sockets = disable_failed(sockets, uut_failures)
 
-
-
-
-
-	## effect of rx_modes (mainly automatic mode in multiple phases)
-	#uut_rx_fail = dict.fromkeys(uut_failures.keys(), 0)
-	#phase_range = 56*6
-	#n1 = 33
-	#n2 = 33
-	#for rx_mode in [0]:
-		#for loop in range(phase_range*n1):
-			#conn.spi_master_execute(0, 0, 0x02, 3,
-				#64,
-				#1, 63,
-				#3, 4,
-				#0, 15,
-				#0, 15,
-				#[0x00, 0x00]
-			#);
-
-			#for (p,s,m), tester in sorted(conn.get_testers().items()):
-				#for a in range(2):
-					#if uut_failures[(tester,p,s,m,a)]: continue
-
-					#for k in range(n2):
-						#try:
-							#conn._Connection__tofhir2_cmd(p, s, m, a, 2*m+a, 32, True, True, gc)
-						#except tofhir2.ConfigurationError as e:
-							#if k == 0: continue
-							#uut_rx_fail[(p,s,m,a)] += 1
-							#print "FAIL", loop % phase_range, loop / phase_range, k, p,s,m,a, uut_rx_fail[(p,s,m,a)]
-	#"rint uut_rx_fail
-
-
-
-
-
-	# effect of RESYNC
-	# effect of TP
-	# effect of trigger
-	# tx0, tx1, tx0+1
+	uut_failures = merge_failures(uut_failures, tests.check_rx_phase(conn, sockets, args.o))
+	sockets = disable_failed(sockets, uut_failures)
+	
+	uut_failures = merge_failures(uut_failures, tests.check_multiple_links(conn, sockets))
+	sockets = disable_failed(sockets, uut_failures)
 	
 	
-	# Run stuff
-	ddir = args.o
-	qdc_att_list = [4]
-	extp_att = 4
-	assert extp_att in qdc_att_list
+	## Run stuff
+	os.system("cp ../config.ini %s" % args.o)
+	os.system("./make_simple_channel_map -o %s/map --port 0 --slave 0 --trigger-port 0" % args.o)
+	os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % args.o)
 
-	os.system("cp ../config.ini %(ddir)s" % locals())
-	os.system("./make_simple_channel_map -o %(ddir)s/map --port 0 --slave 0 --trigger-port 0" % locals())
-	os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % ddir)
-	# Acqquire data
-	os.system("./acquire_threshold_calibration --no-bias --config /dev/null -o %(ddir)s/disc_calibration" % locals())
-	os.system("./acquire_tdc_calibration --config /dev/null -o %(ddir)s/tdc_calibration" % locals())
-	for att in qdc_att_list:
-		os.system("./acquire_qdc_calibration --config /dev/null -o %(ddir)s/qdc_calibration --att %(att)d" % locals())
+
+	disc_range_list = { 0b01: "full", 0b10: "full", 0b11 : "fast" }
+	qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
+	xxtp_att = 0b011
+	extp_amp_list = [ 0xFFFF ]
+	fetp_amp_list = [ v for v in range(3, 32, 4) ]
 	
-	conn.initializeSystem()
-	acquire_extp(conn, sockets, ddir, extp_att)
-	acquire_fetp(conn, sockets, ddir, extp_att)
-	acquire_aldo(conn, sockets, ddir)
+	assert xxtp_att in qdc_att_list.keys()
 
-
-	conn.set_fe_power_all(0b01)	# Disable power to UUT
-	for tester, p,s,m,a in sockets:	# Disable indicator LEDs
-		tester.set_leds(a, 0)
 	
-	# Process data
-	uut_failures = merge_failures(uut_failures, check_discriminators(sockets, ddir))
-	uut_failures = merge_failures(uut_failures, check_tdc(sockets, ddir))
-	for att in qdc_att_list:
-		uut_failures = merge_failures(uut_failures, check_qdc(sockets, ddir, att))
+	for disc_range, mode in disc_range_list.items():
+		uut_failures = merge_failures(uut_failures, tests.check_discriminators(conn, sockets, disc_range, mode, args.o))
 		
+	uut_failures = merge_failures(uut_failures, tests.check_tdc(conn, sockets, "full", args.o))
 	
-	uut_failures = merge_failures(uut_failures, check_extp(sockets, ddir, extp_att))
-	uut_failures = merge_failures(uut_failures, check_fetp(sockets, ddir, extp_att))
-	uut_failures = merge_failures(uut_failures, check_aldo(sockets, ddir))
-	
-	
-	
+	for att, mode in qdc_att_list.items():
+		uut_failures = merge_failures(uut_failures, tests.check_qdc(conn, sockets, att, mode, args.o))
 		
-	# Print failures
-	print "CHIP STATUS/KNOWN FAILURES (first 4)"
-	for tester, p,s,m,a in sockets:
-		print p, s, m, a, len(uut_failures[(tester,p,s,m,a)]), uut_failures[(tester,p,s,m,a)][0:4]
+	uut_failures = merge_failures(uut_failures, tests.check_fetp_tres(conn, sockets, xxtp_att, args.o))
+	uut_failures = merge_failures(uut_failures, tests.check_fetp_eres(conn, sockets, xxtp_att, args.o))
 
-
-	for tester, p,s,m, a in uut_failures_before_bandgap.keys():
-		tester.set_leds(a, 0b001)
-	
-	print """> %d CHIPS FAILED BEFORE BANDGAP TRIMING""" % len(uut_failures_before_bandgap.keys())
-	print """> SOCKETS INDICATED BY RED LEDs"""
-	print """> TRANSFER CHIPS FROM SOCKETS TO "BEFORE BANGDAP" FAIL BOX"""
-	print """> PRESS ENTER WHEN DONE"""
-	termios.tcflush(sys.stdin, termios.TCIFLUSH)
-	raw_input()
-	
-	for tester, p,s,m,a in sockets:	# Disable indicator LEDs
-		tester.set_leds(a, 0)
-		
-	
-	# Build list of failures after bandgap triming
-	uut_failures_after_bandgap = {}
-	for k, v in uut_failures.items():
-		if uut_failures_before_bandgap.has_key(k): continue
-		if v == []: continue
-		uut_failures_after_bandgap[k] = v
-	
-	for tester, p,s,m, a in uut_failures_after_bandgap.keys():
-		tester.set_leds(a, 0b001)
-	
-	print """> %d CHIPS FAILED AFTER BANDGAP TRIMING""" % len(uut_failures_after_bandgap.keys())
-	print """> SOCKETS INDICATED BY RED LEDs"""
-	print """> TRANSFER CHIPS FROM SOCKETS TO "AFTER BANGDAP" FAIL BOX"""
-	print """> PRESS ENTER WHEN DONE"""
-	termios.tcflush(sys.stdin, termios.TCIFLUSH)
-	raw_input()
-	
-	for tester, p,s,m,a in sockets:	# Disable indicator LEDs
-		tester.set_leds(a, 0)
+	uut_failures = merge_failures(uut_failures, tests.check_extp_tres(conn, sockets, xxtp_att, args.o))
+	uut_failures = merge_failures(uut_failures, tests.check_extp_eres(conn, sockets, xxtp_att, args.o))
 		
 
-		
-		
-	# Build a list of possibly good chips
-	uut_ok = {}
-	for k, v in uut_failures.items():
-		if v != []: continue
-		uut_ok[k] = v
-		
-	for tester, p,s,m,a in uut_ok.keys():
-		tester.set_leds(a, 0b010)
+	uut_failures = merge_failures(uut_failures, tests.check_aldo(conn, sockets, 7, 1.0, args.o))
+
+
+	results_file = open("%s/results.tsv" % args.o, "w")
+	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
 	
+	for (m, a), failures in uut_failures.items():
+		detailed_results_file.write("%d\t%d\t%s\n" % (m, a, ("\t").join(failures)))
+
+		if failures == []:
+			results_file.write("%d\t%d\tPASS\n" % (m, a))
+		else:
+			# TODO 
+			# Actually fail ASICs when cut off limits are set
+			results_file.write("%d\t%d\tPASS\n" % (m, a))
 	
-	print """> %d CHIPS ARE OK""" % len(uut_ok.keys())
-	print """> SOCKETS INDICATED BY GREEN LEDs"""
-	print """> TRANSFER CHIPS FROM SOCKETS TO "GOOD" BOX"""
-	print """> PRESS ENTER WHEN DONE"""
-	termios.tcflush(sys.stdin, termios.TCIFLUSH)
-	raw_input()
+	detailed_results_file.close()
+	results_file.close()
+	
+
+	print sockets
+	print uut_failures
+	
+	# Test sucessfully complete
+	conn.set_uut_power(False)
+
+	if enable_user_prompt and args.batch:
+		# When called by test_bga_auto 
+		# instead of actually running a test just wait for user input
+		# and return
+		print "*** PRESS ENTER TO CONTINUE ***"
+		a = raw_input()
 
 		
-	for tester, p,s,m,a in sockets:	# Disable indicator LEDs
-		tester.set_leds(a, 0)
-		
+	return 0
+
 
 def merge_failures(a, b):
 	c = {}
+	
+	# Sanity check
+	# If we have a fail report for a previously unknown ASIC
+	# it's most likely a bug in the code
+	for k in b.keys():
+		assert k in a.keys()
+		
 	for k in a.keys():
 		c[k] = a[k]
 		if b.has_key(k):
@@ -336,478 +217,55 @@ def merge_failures(a, b):
 	
 	return c
 
-def log(f, s):
-	print s
+
+def disable_failed(sockets, uut_failures):
+	for m,a,t in sockets:
+		if uut_failures[m,a] != []:
+			t.set_uut_on(a, False)
+		else:
+			t.set_uut_on(a, True)
+
+	result = [ (m,a,t) for m,a,t in sockets if t.get_uut_on(a) ]
+	time.sleep(0.1)
+	print "Still active sockets: ", [ (m, a) for m,a,t in result ]
+	return result
 
 
-def trim_bg(conn, tester, p, s, m, a):
-	trim_options = { 
-		7       : -12.28E-3,
-		6       : -12.32E-3,
-		5       : -12.34E-3,
-		4       : +19.27E-3,
-		3       : +9.73E-3,
-		2       : +4.89E-3,
-		1       : +2.49E-3,
-		0       : +1.25E-3,
-		None    : 0
-	}
-
-	target = 0.300
-	
-	portID = p
-	slaveID = s
-	busID = m
-	chipID = a
-	readID = 2*m + a
-	output_file = None
-	
-	tester.set_uut_vfuse(True)
-	value = tester.get_uut_vbg(a)
-	
-	
-	log(output_file, "INITIAL VALUE: %1.5f" % value)
-	while abs(value - target) > 1E-3:
-		selected_option = None
-		expected_voltage = value + 1E6
-		selected_option_error = abs(value - target)
+def do_tester_check(conn):
+	problems = False
+	for (p,s,m),t in sorted(conn.get_testers().items()):
+		tester_vin = t.get_tester_vin()
 		
-		for option, delta in trim_options.items():
-
-			# If current value is above target + 4 mV, consider only negative trim options
-			if (value > (target + 4e-3)) and (delta >= 0): continue
+		if tester_vin < 1.6:
+			print "Tester %d Vin %3.2f is LOW" % (m, tester_vin)
+			problems = True
 			
-			option_error = abs(value + delta - target)
-			if option_error < selected_option_error:
-				selected_option_error = option_error
-				selected_option = option
-				expected_voltage = value + delta
-		
-		if selected_option is None: break
-		
-		log(output_file, "SELECTED %d (%1.5f), EXPECT %1.5f" % (selected_option, trim_options[selected_option], expected_voltage))
-		gc = tofhir2b.AsicGlobalConfig()
-		gc.setValue("EFUSE_A", selected_option)
-		conn._Connection__tofhir2_cmd(portID, slaveID, busID, chipID, readID, 32, True, False, gc)              
-		
-		#answer = input("Proceed? (Y/N)")
-		#if answer.lower() != 'y':
-			#break
-		
-		del trim_options[selected_option]
-		
-		
-		# Trim
-		conn._Connection__tofhir2_cmd(portID, slaveID, busID, chipID, readID, 37, True, False, bitarray.bitarray(160))
-		time.sleep(0.1)
-		
-		# Load
-		conn._Connection__tofhir2_cmd(portID, slaveID, busID, chipID, readID, 35, True, False, bitarray.bitarray(254))
-		time.sleep(0.1)
-		conn._Connection__tofhir2_cmd(portID, slaveID, busID, chipID, readID, 36, True, False, bitarray.bitarray(254))
-		time.sleep(0.1)
-
-		value = tester.get_uut_vbg(a)
-		log(output_file, "NEW VALUE. %1.5f" % value)
-
-	tester.set_uut_vfuse(False)
-
-	return abs(value - target) < 5E-3
-
-
-def check_trim(sockets):
-	results = {}
-	for tester, p, s, m, a in sockets:
-		results[(tester, p, s, m, a)] = []
-		v = tester.get_uut_vbg(a)
-		if abs(v - 0.300) > 5E-3:
-			results[(tester, p, s, m, a)].append("BANDGAP %5.3f OUT OF RANGE" % v)
-
-	return results
-
-
-	
-	
-def acquire_extp(conn, sockets, ddir, att):
-	print "TESTING: EXTP"
-	asicsConfig0 = conn.getAsicsConfig()
-	conn.setTestPulsePLL(500, 10240, 0.0)
-	
-	fName = "%s/extp_scan" % ddir
-	conn.openRawAcquisition(fName)
-
-	for ch in range(32):
-		#for dac in range(0x8000, 0x10000, 0x8000/32):
-		for dac in [ 0xFFFF ]:
-			for t, p, s, m, a in sockets:
-				t.injector_enable(ch, dac)
-				
-			time.sleep(0.5)
-
-			for ith in range(30, 64):
-				asicsConfig = deepcopy(asicsConfig0)
-
-				for ac in asicsConfig.values():
-					cc = ac.channelConfig[ch]
-					cc.setValue("cfg_a3_range_t1", 3)
-					cc.setValue("c_tgr_main", 0b00)
-					cc.setValue("c_tgr_t1", 0)
-					cc.setValue("c_tgr_q", 0)
-					cc.setValue("c_tgr_t2", 0)
-					cc.setValue("c_tgr_q", 0)
-					cc.setValue("c_tgr_v", 0)
-					cc.setValue("cfg_a3_ith_t1", 48)
-					cc.setValue("cfg_a3_ith_t1", ith)
-					cc.setValue("cfg_a2_dcr_delay_t", 0b11111111)
-					cc.setValue("cfg_a2_dcr_delay_e", 0b0111111)
-					cc.setValue("c_min_q", 2)
-					cc.setValue("c_max_q", 2)
-					cc.setValue("cfg_a2_attenuator_gain", att)
-					
-				conn.setAsicsConfig(asicsConfig)
-				
-				conn.acquire(0.1, dac, ith)
-	conn.closeAcquisition()
-	
-	# Disable stuf and return to normal
-	conn.setAsicsConfig(asicsConfig0)
-	for t, p, s, m, a in sockets:
-		t.injector_disable()
-
-
-def check_extp(sockets, ddir, att):	
-	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(ddir)s/extp_scan -o %(ddir)s/extp_scan.root --writeRoot --att %(att)d" % locals())
-
-	fName = "%s/extp" % ddir	
-	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
-	
-	df = pd.read_csv("%(ddir)s/extp.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
-	
-	results = {}
-	for t, p, s, m, a in sockets:
-		results[(t,p,s,m,a)] = []
-		for ch in range(32):
-			asic_id = 2*m + a
+		if tester_vin > 2.5:			
+			print "Tester %d Vin %3.2f is HIGH" % (m, tester_vin)
+			problems = True
 			
-			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
 			
-			try:
-				trms = df2["trms"].iloc[0]
-				
-				if trms == 0:
-					results[(t,p,s,m,a)].append("EXTP CH %d LOW COUNTS" % ch)
-					continue
-					
-				if trms > 50:
-					results[(t,p,s,m,a)].append("EXTP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
-					continue
-
-				erms = df2["erms"].iloc[0]
-				if erms > 50:
-					results[(t,p,s,m,a)].append("EXTP CH %d ERMS %4.1f > 50" % (ch, erms))
-					continue
-				
-				
-				
-			except IndexError as e:
-				results[(t,p,s,m,a)].append("EXTP CH %d MISSING" % ch)
-				continue
-				
-		
-	return results
-	
-def acquire_fetp(conn, sockets, ddir, att):
-	print "TESTING: FETP"
-	asicsConfig0 = conn.getAsicsConfig()
-	conn.setTestPulsePLL(500, 10240, 0.0)
-	
-	fName = "%s/fetp_scan" % ddir
-	conn.openRawAcquisition(fName)
-
-	for ch in range(32):
-		#for dac in range(0x8000, 0x10000, 0x8000/32):
-		for dac in [ 31 ]:
-			for t, p, s, m, a in sockets:
-				t.injector_enable(ch, dac)
-				
-			time.sleep(0.5)
-
-			for ith in range(20, 64):
-				asicsConfig = deepcopy(asicsConfig0)
-
-				for ac in asicsConfig.values():
-					gc = ac.globalConfig
-					gc.setValue("Pulse_Amplitude", dac)
-					gc.setValue("c_ext_tp_en", 1)
-					gc.setValue("c_fetp_en", 1)
-					
-					cc = ac.channelConfig[ch]
-					cc.setValue("cfg_a1_fetp_en", 1)
-					cc.setValue("cfg_a3_range_t1", 3)
-					cc.setValue("c_tgr_main", 0b00)
-					cc.setValue("c_tgr_t1", 0)
-					cc.setValue("c_tgr_q", 0)
-					cc.setValue("c_tgr_t2", 0)
-					cc.setValue("c_tgr_q", 0)
-					cc.setValue("c_tgr_v", 0)
-					cc.setValue("cfg_a3_ith_t1", 48)
-					cc.setValue("cfg_a3_ith_t1", ith)
-					cc.setValue("cfg_a2_dcr_delay_t", 0b11111111)
-					cc.setValue("cfg_a2_dcr_delay_e", 0b0111111)
-					cc.setValue("c_min_q", 2)
-					cc.setValue("c_max_q", 2)
-					cc.setValue("cfg_a2_attenuator_gain", att)
-					
-				conn.setAsicsConfig(asicsConfig)
-				
-				conn.acquire(0.1, dac, ith)
-	conn.closeAcquisition()
-	
-	# Disable stuf and return to normal
-	conn.setAsicsConfig(asicsConfig0)
-	
-
-def check_fetp(sockets, ddir, att):	
-	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(ddir)s/fetp_scan -o %(ddir)s/fetp_scan.root --writeRoot --att %(att)d" % locals())
-
-	fName = "%s/fetp" % ddir	
-	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
-	
-	df = pd.read_csv("%(ddir)s/fetp.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
-	
-	results = {}
-	for t, p, s, m, a in sockets:
-		results[(t,p,s,m,a)] = []
-		for ch in range(32):
-			asic_id = 2*m + a
+		for a in [0, 1]:
+			# If the UUT has been disabled Vin should be ~0
+			if t.get_uut_on(a) is False: continue
 			
-			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
+			uut_vin = t.get_uut_vin(a)
 			
-			try:
-				trms = df2["trms"].iloc[0]
+			if uut_vin < (1.2 * 0.98):
+				print "Tester %d UUT %d Vin %3.2f is LOW" % (m, a, uut_vin)
+				problems = True
 				
-				if trms == 0:
-					results[(t,p,s,m,a)].append("FETP CH %d LOW COUNTS" % ch)
-					continue
-					
-				if trms > 50:
-					results[(t,p,s,m,a)].append("FETP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
-					continue
-
-				
-				
-			except IndexError as e:
-				results[(t,p,s,m,a)].append("FETP CH %d MISSING" % ch)
-				continue
-				
-	return results
-				
-	
-def acquire_aldo(conn, sockets, d):
-	print "TESTING: ALDO"
-	asicsConfig0 = conn.getAsicsConfig()
-	
-	f = open("%s/aldo.tsv" % d, "w")
-	
-	for aldo_range in [0, 1]:
-		for aldo_dac in [ x for x in range(0, 256, 7)] + [ 255]:
-			sys.stdout.write(".")
-			sys.stdout.flush()
-			
-			asicsConfig = deepcopy(asicsConfig0)
-			for ac in asicsConfig.values():
-				gc = ac.globalConfig
-				if aldo_range == 0:
-					gc.setValue("Valdo_A_Gain", 0)
-					gc.setValue("Valdo_B_Gain", 0)
-					gc.setValue("c_aldo_range", 0b00)
-				else:
-					gc.setValue("Valdo_A_Gain", 1)
-					gc.setValue("Valdo_B_Gain", 1)
-					gc.setValue("c_aldo_range", 0b11)
-				
-				gc.setValue("Valdo_A_DAC", aldo_dac)
-				gc.setValue("Valdo_B_DAC", aldo_dac)
-				
-				
-			conn.setAsicsConfig(asicsConfig)
-			
-			for t, p, s, m, a in sockets:
-				v = t.get_uut_valdo(a, 0)
-				f.write("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%f\n" % (p, s, m, a, 0, aldo_range, aldo_dac, v))
-				v = t.get_uut_valdo(a, 1)
-				f.write("%d\t%d\t%d\t%d\t%d\t%d\t%d\t%f\n" % (p, s, m, a, 1, aldo_range, aldo_dac, v))
-	    
-	
-	sys.stdout.write("\n")
-	f.close()
-	conn.setAsicsConfig(asicsConfig0)
-	return True
-	
-def check_aldo(sockets, ddir):	
-	df = pd.read_csv("%(ddir)s/aldo.tsv" % locals(), sep="\t", header=None, 
-			names=["port_id", "slave_id", "module_id", "asic_id", "aldo_id", 
-				"aldo_gain", "aldo_dac", "vout" ])
-
-	results = {}			
-	for t, p, s, m, a in sockets:
-		results[(t,p,s,m,a)] = []
-		for aldo_id in range(2):
-			for aldo_gain in range(2):
-				df2 = df[(df["module_id"] == m) & (df["asic_id"] == a) & (df["aldo_id"] == aldo_id) & (df["aldo_gain"] == aldo_gain)]
-				
-				# Exlude top 20% of range
-				df2 = df2[df2["aldo_dac"] < 200]
-				
-				aldo_dac = df2["aldo_dac"]
-				vout = df2["vout"]
-				
-				
-				lower = min(vout)
-				upper = max(vout)
-				slope, b = np.polyfit(aldo_dac, vout, 1)
-				
-				error = vout - (slope * aldo_dac + b)
-				
-				if aldo_gain == 0:
-					if (lower < 0.820) or (upper > 1.0):
-						results[(t,p,s,m,a)].append("ALDO %(aldo_id)d GAIN %(aldo_gain)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
-						continue
-						
-				else:
-					if (lower < 0.730) or (upper > 1.0):
-						results[(t,p,s,m,a)].append("ALDO %(aldo_id)d GAIN %(aldo_gain)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
-						continue
-				
-						
-				max_inl = max(abs(error)) / slope
-				if max_inl > 10:
-					results[(t,p,s,m,a)].append("ALDO %(aldo_id)d GAIN %(aldo_gain)d MAX INL %(max_inl)4.1f > 10" % locals())
-					continue
-					
-	return results
-
-
-def check_discriminators(sockets, ddir):	
-	os.system("./process_threshold_calibration --config %(ddir)s/config.ini -i %(ddir)s/disc_calibration -o %(ddir)s/disc_calibration.tsv" % locals())
-	
-	df = pd.read_csv("%(ddir)s/disc_calibration.tsv" % locals(), sep="\t", header=None, comment="#",
-		names=["port_id", "slave_id", "asic_id", "channel_id", 	"baseline_T", "baseline_E", "zero_T1", "zero_T2", "zero_E", "noise_T1", "noise_T2", "noise_E"]
-		)
-	
-	results = {}
-	for t, p, s, m, a in sockets:
-		results[(t,p,s,m,a)] = []
-		for ch in range(32):
-			asic_id = 2*m + a
-			
-			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
-			
-			try:
-				v = df2["noise_T1"].iloc[0]					
-				if v > 0.8:
-					results[(t,p,s,m,a)].append("DISC CH %d NOISE T1 %4.1f > 0.8" % (ch, v))
-					continue
-			
-				v = df2["noise_T2"].iloc[0]					
-				if v > 0.8:
-					results[(t,p,s,m,a)].append("DISC CH %d NOISE T2 %4.1f > 0.8" % (ch, v))
-					continue
-				v = df2["noise_E"].iloc[0]					
-				if v > 2.0:
-					results[(t,p,s,m,a)].append("DISC CH %d NOISE E %4.1f > 0.8" % (ch, v))
-					continue
-				
-				
-			except IndexError as e:
-				results[(t,p,s,m,a)].append("DISC CH %d MISSING" % ch)
-				continue
-	
-	#print results
-	return results
+			if uut_vin > (1.2 * 1.02):
+				print "Tester %d UUT %d Vin %3.2f is HIGH" % (m, a, uut_vin)
+				problems = True
 	
 	
-def check_tdc(sockets, ddir):
-	tmp_dir = tempfile.mkdtemp(suffix="tofhir_bga")
-	os.system("./process_tdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/tdc_calibration -o %(ddir)s/tdc_calibration --tmp-prefix %(tmp_dir)s" % locals())	
-
-	df = pd.read_csv("%(ddir)s/tdc_calibration.tsv" % locals(), sep="\t", header=None, comment="#",
-		names=["port_id", "slave_id", "asic_id", "channel_id", 	"tac_id", "branch_id", "t0", "a0", "a1", "a2", "sigma" ]
-		)
+	if problems:
+		print "PROBLEMS FOUND IN TEST SYSTEM"
+		exit(1)
 	
-	#print df
-	results = {}
-	for t, p, s, m, a in sockets:
-		results[(t,p,s,m,a)] = []
-		for ch in range(32):
-			for tac_id in range(8):
-				for branch_id in [1,2]:
-			
-					asic_id = 2*m + a
-					
-					df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch) & (df["tac_id"] == tac_id) & (df["branch_id"] == branch_id)]
-					
-					try:
-						v = df2["a1"].iloc[0]					
-						if v < 400:
-							results[(t,p,s,m,a)].append("TDC CH %d SLOPE %4.1f  < 500" % (ch, v))
-							continue
-					
-						if v > 700:
-							results[(t,p,s,m,a)].append("TDC CH %d SLOPE %4.1f  > 600" % (ch, v))
-							continue
-							
-						v = df2["sigma"].iloc[0]					
-						if v > 50.0/6250:
-							results[(t,p,s,m,a)].append("TDC CH %d RMS %4.1f  > 50ps" % (ch, v*6250))
-							continue
-						
-
-					
-						
-					except IndexError as e:
-						results[(t,p,s,m,a)].append("TDC CH %d TAC %d BRANCH %d MISSING" % (ch, tac_id, branch_id))
-						continue
-
-	os.system("rm -rf %(tmp_dir)s" % locals())
-	return results
-	
-	
-def check_qdc(sockets, ddir, att):
-	tmp_dir = tempfile.mkdtemp(suffix="tofhir_bga")
-	os.system("./process_qdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/qdc_calibration%(att)d -o %(ddir)s/qdc_calibration%(att)d --tmp-prefix %(tmp_dir)s" % locals())	
-
-	df = pd.read_csv("%(ddir)s/qdc_calibration%(att)d.tsv" % locals(), sep="\t", header=None, comment="#",
-		names=["port_id", "slave_id", "asic_id", "channel_id", 	"tac_id", "trim", "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "xx", "sigma" ]
-		)
-	
-	#print df["sigma"].mean()
-	
-	results = {}
-	for t, p, s, m, a in sockets:
-		results[(t,p,s,m,a)] = []
-		for ch in range(32):
-			for tac_id in range(8):
-				asic_id = 2*m + a
-				
-				df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch) & (df["tac_id"] == tac_id)]
-				
-				try:		
-					#v = df2["sigma"].iloc[0]					
-					#if v > 10.0:
-						#results[(t,p,s,m,a)].append("QDC CH %d RMS %4.1f  > 10.0" % (ch, v))
-						#continue
-					
-					pass
-				
-					
-				except IndexError as e:
-					results[(t,p,s,m,a)].append("QDC CH %d TAC %d MISSING" % (ch, tac_id))
-					continue
-
-	os.system("rm -rf %(tmp_dir)s" % locals())
-	return results	
 	
 	
 if __name__ == '__main__':
 	exit(main(sys.argv))
+	

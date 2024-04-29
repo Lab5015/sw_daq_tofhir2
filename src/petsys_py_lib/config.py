@@ -454,20 +454,16 @@ def readQDCModeTable(fn):
 	return c
 
 def readQDCTrimTable(fn):
-        for att in range(8):
-                if os.path.exists(fn % att):
-	                f = open(fn % att)
-	                c = {}
-                        ln = 0
-	                for l in f:
-                                ln += 1
-		                l = normalizeAndSplit(l)
-		                if l == ['']: continue
-		                portID, slaveID, chipID, channelID, tacID, trim = [ int(v) for v in l[0:6] ]
-                                if not c.has_key((portID, slaveID, chipID, channelID)):
-                                   c[(portID, slaveID, chipID, channelID)] = {}
-		                c[(portID, slaveID, chipID, channelID)] =  trim
-	                f.close()
+	f = open(fn)
+	c = {}
+	for l in f:
+		l = normalizeAndSplit(l)
+		if l == ['']: continue
+		portID, slaveID, chipID, channelID, tacID, trim = [ int(v) for v in l[0:6] ]
+		if not c.has_key((portID, slaveID, chipID, channelID)):
+			c[(portID, slaveID, chipID, channelID)] = {}
+		c[(portID, slaveID, chipID, channelID)] =  trim
+	f.close()
 	return c
 
 

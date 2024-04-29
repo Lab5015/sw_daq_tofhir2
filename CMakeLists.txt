@@ -84,7 +84,9 @@ configure_file("src/gui/start_gui" "start_gui" COPYONLY)
 configure_file("src/petsys_util/tester_set_uut_power" "tester_set_uut_power" COPYONLY)
 configure_file("src/petsys_util/tester_read_dc" "tester_read_dc" COPYONLY)
 configure_file("src/petsys_util/tester_scan_aldo" "tester_scan_aldo" COPYONLY)
+configure_file("src/petsys_py_lib/tests.py" "petsys/tests.py" COPYONLY)
 configure_file("src/petsys_util/bga_test" "bga_test" COPYONLY)
+configure_file("src/petsys_util/fe_test" "fe_test" COPYONLY)
 configure_file("src/petsys_util/acquire_exttp_calibration" "acquire_exttp_calibration" COPYONLY)
 
 

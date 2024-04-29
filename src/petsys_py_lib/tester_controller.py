@@ -34,46 +34,31 @@ class Connection(daqd.Connection):
 
 
 
-	def set_fe_power_all(self, mask):
-		
-		if (mask & 0b1) == 0:
-			# Everything off
-			for portID, slaveID in self.getActiveFEBDs():
-				self.write_config_register(portID, slaveID, 8, 0x0213, 0b0)
+	def set_uut_power(self, on):
+		# Always ensure controller is providing all power rails to testers
+		wait_for_power = False
+		for portID, slaveID in self.getActiveFEBDs():
+			pwr_en = self.read_config_register(portID, slaveID, 8, 0x0213)
+			if (pwr_en & 0b11) != 0b11:
+				wait_for_power = True
+				
+			self.write_config_register(portID, slaveID, 8, 0x0213, 0b11)
+				
+		if wait_for_power:
+			# If a FEB/D was powered off wait for a second for power to stabilize
+			# and Tester FPGAs to boot
+			time.sleep(1.0)
 
-
-		elif (mask & 0b10) == 0:
-			# Power to Testers only
-			# Disable 44 V and TEC source if enabled, leave only tester power
-
-			for portID, slaveID in self.getActiveFEBDs():
-				pwr_en = 0b01
-				self.write_config_register(portID, slaveID, 8, 0x0213, pwr_en)
-
-			for key, tester in self.get_testers().items():
-				tester.set_uut_power(False)
-		else:
-			# Ensure low voltage on for Testers
-			for portID, slaveID in self.getActiveFEBDs():
-				pwr_en = self.read_config_register(portID, slaveID, 8, 0x0213)
-				pwr_en |= 0b01
-				self.write_config_register(portID, slaveID, 8, 0x0213, pwr_en)
-			time.sleep(0.2)
+		wait_for_power = False
+		for key, tester in self.get_testers().items():
+				pwr_en = tester.get_uut_power()
+				if pwr_en is False and on:
+					wait_for_power = True
+					
+				tester.set_uut_power(on)
 			
-			try:
-				for key, tester in self.get_testers().items():
-					# Enable power to UUTs and perform basic power checks
-					tester.set_uut_power(True)
-			except tester_common.TesterPowerException as e:
-				# There was a serious problem when powering up one of the testers
-				# Cut all power and pass the exeption upstream
-				self.write_config_register(portID, slaveID, 8, 0x0213, 0)
-				raise e
-
-			# Finally turn the 44 V source
-			for portID, slaveID in self.getActiveFEBDs():
-				self.write_config_register(portID, slaveID, 8, 0x0213, 0b0101)
-		
+		if wait_for_power:
+			time.sleep(1.0)
 
 	def set_tec_power(self, on):
 		for portID, slaveID in self.getActiveFEBDs():

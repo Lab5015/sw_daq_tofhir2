@@ -15,16 +15,15 @@ def ffmt(v):
 
 def main():
 	conn = tester_controller.Connection()
-	parser = argparse.ArgumentParser(description='Set UUT power ON/OFF')
+	parser = argparse.ArgumentParser(description='Read tester DC values')
 	parser.add_argument("-o", type=str, default=None, help="Output file")
-	parser.add_argument("--no-power-up", dest="no_power_up", action="store_true", help="Enable UUT power")
+	parser.add_argument("--no-power-up", dest="nopup", action="store_true", help="Don't power up UUT")
 	args = parser.parse_args()
 
 	
 	# We need to initialize TOFHiRs and enable the ALDO HV outputs to be able to measure HV
-	# and reasonable DC currents
-	if not args.no_power_up:
-		conn.set_fe_power_all(0b11)	# Enable power to UUTs
+	if args.nopup == False:
+		conn.set_uut_power(True)
 	conn.initializeSystem()
 
 	asicsConfig = conn.getAsicsConfig()
@@ -82,7 +81,6 @@ def main():
 		output_file.write("UUT1 Idd  (A):\t%s\n" % ("\t").join([ ffmt(t.get_uut_iin(1)) for t in tt ]))
 		output_file.write("UUT0 Vbg  (V):\t%s\n" % ("\t").join([ ffmt(t.get_uut_vbg(0)) for t in tt ]))
 		output_file.write("UUT1 Vbg  (V):\t%s\n" % ("\t").join([ ffmt(t.get_uut_vbg(1)) for t in tt ]))
-
 
 	return 0
 

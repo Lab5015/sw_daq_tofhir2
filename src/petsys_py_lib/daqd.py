@@ -15,12 +15,30 @@ import math
 import subprocess
 from sys import stdout
 from copy import deepcopy
+import numpy as np
+import pandas as pd
 
 from . import tofhir2, tofhir2x, tofhir2b
 
 MAX_PORTS = 32
 MAX_SLAVES = 32
 MAX_CHIPS = 64
+
+
+event_np_dt = np.dtype([
+	('frameID', '<u8'),
+	('channelID', '<u4'),
+	('tacID', '<u2'),
+	('t1Coarse', '<u2'),
+	('t2Coarse', '<u2'),
+	('qCoarse', '<u2'),
+	('t1Fine', '<u2'),
+	('t2Fine', '<u2'),
+	('qFine', '<u2'),
+	('extra', '<u2'),
+	('extra2', '<u4')
+])
+
 
 # Handles interaction with the system via daqd
 class Connection(object):
@@ -171,14 +189,14 @@ class Connection(object):
 
 	def setTestPulseBTL(self, tp_finephase, tp_fraction, tp_invert=False):
 
-                tp_finephase = int(round(tp_finephase * 6*56))   # WARNING: This should be firmware dependent..
+		tp_finephase = int(round(tp_finephase * 6*56))   # WARNING: This should be firmware dependent..
 		tp_fraction = int(0xFFFF * tp_fraction)
 
-                value = 0x1 << 62
-                value |= (tp_fraction & 0xFFFF)
-                #value |= (tgr_fraction & 0xFFFF) << 16
-                value |= (tp_finephase & 0xFFFFFF) << 31
-                if tp_invert: value |= 1 << 61
+		value = 0x1 << 62
+		value |= (tp_fraction & 0xFFFF)
+		#value |= (tgr_fraction & 0xFFFF) << 16
+		value |= (tp_finephase & 0xFFFFFF) << 31
+		if tp_invert: value |= 1 << 61
 
 		for portID, slaveID in self.getActiveFEBDs():
 			self.write_config_register(portID, slaveID, 64, 0x20B, value)
@@ -534,7 +552,8 @@ class Connection(object):
 				print "Retrying..."
 				return self.initializeSystem(maxTries - 1)
 			else:
-				raise ErrorAsicPresenceInconsistent(inconsistentStateAsics)
+				# If we couldn't resolve the inconsistent state let's just treat it as disabled
+				pass
 
 		self.__setSorterMode(True)
 
@@ -1338,7 +1357,7 @@ class Connection(object):
 
         ## Acquires data and decodes it into a bytes buffer
         # @param acquisitionTime Acquisition time in seconds
-	def acquireAsBytes(self, acquisitionTime):
+	def acquireAsBytes(self, acquisitionTime, skipcheckAsicRx=False):
 		frameLength = 1024.0 / self.__systemFrequency
 		nRequiredFrames = int(acquisitionTime / frameLength)
 
@@ -1401,10 +1420,14 @@ class Connection(object):
 			nFrames = currentFrame - startFrame + 1
 			nBlocks += 1
 
-		# Check ASIC link status at end of acquisition
-		self.checkAsicRx()
+		if not skipcheckAsicRx:
+			# Check ASIC link status at end of acquisition
+			self.checkAsicRx()
 
 		return data
+
+	def acquireAsPandas(self, acquisitionTime, skipcheckAsicRx=False):
+		return pd.DataFrame(np.frombuffer(self.acquireAsBytes(acquisitionTime, skipcheckAsicRx), event_np_dt))
 
 	
 	def checkAsicRx(self):

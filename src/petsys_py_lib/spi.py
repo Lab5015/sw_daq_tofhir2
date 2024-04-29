@@ -98,6 +98,21 @@ def ad7738_ll(conn, portID, slaveID, chipID, command):
         	p,p+w,      # miso
                 padding + command + padding)
 
+def ad7738_reset(conn, portID, slaveID, chipID):
+	command = [ 0x00, 0xFF, 0xFF, 0xFF, 0xFF ]
+        w = 8 * len(command)
+        padding = [0xFF for n in range(1) ]
+        p = 8 * len(padding)
+
+        # Pad the cycle with zeros
+        return conn.spi_master_execute(portID, slaveID, 0x02, chipID,
+                p+w+p,          # cycle
+                p,p+w,          # sclk en
+                p-1,p+w+1,      # cs
+                0, p+w+p,       # mosi
+        	p,p+w,      # miso
+                padding + command + padding)
+
 def ad7738_set_register(conn, portID, slaveID, chipID, register, value):
 	ad7738_ll(conn, portID, slaveID, chipID, 0b00000000 | register)
 	ad7738_ll(conn, portID, slaveID, chipID, value)
@@ -111,6 +126,27 @@ def ad7738_get_register(conn, portID, slaveID, chipID, register, l=1):
 
 	return retval
 
+def adc7738_calibrate(conn, portID, slaveID, chipID):
+	ad7738_reset(conn, portID, slaveID, chipID)
+
+	for ch in range(8):
+		ad7738_set_register(conn, portID, slaveID, chipID, 0x30 + ch, 0b11111111)
+		ad7738_set_register(conn, portID, slaveID, chipID, 0x28 + ch, 0b10001101)
+
+	ad7738_set_register(conn, portID, slaveID, chipID, 0x38 + 0b111, 0b10000010)
+	time.sleep(0.1)
+	#print "ADC ZS = 0x%06X" % ad7738_get_register(conn, portID, slaveID, chipID, 0x06, l=3)
+	#print "ADC FS = 0x%06X" % ad7738_get_register(conn, portID, slaveID, chipID, 0x07, l=3)
+
+	#for ch in range(8):
+		#print "CH%d ZS = 0x%06X" % (ch, ad7738_get_register(conn, portID, slaveID, chipID, 0x10+ch, l=3))
+		#print "CH%d FS = 0x%06X" % (ch, ad7738_get_register(conn, portID, slaveID, chipID, 0x18+ch, l=3))
+	
+
+	return None
+		
+
+
 def ad7738_check(conn, portID, slaveID, chipID):
 	u = ad7738_get_register(conn, portID, slaveID, chipID, 0x02)
 	u = ad7738_get_register(conn, portID, slaveID, chipID, 0x02)
@@ -119,13 +155,15 @@ def ad7738_check(conn, portID, slaveID, chipID):
 def ad7738_read_channel(conn, portID, slaveID, chipID, ch):
 	ad7738_check(conn, portID, slaveID, chipID)
 
-	ad7738_set_register(conn, portID, slaveID, chipID, 0x28 + ch, 0b00001101)
+	# This should be the same settings as used in the adc7738_calibrate function
+	ad7738_set_register(conn, portID, slaveID, chipID, 0x30 + ch, 0b11111111)
+	ad7738_set_register(conn, portID, slaveID, chipID, 0x28 + ch, 0b10001101)	
 	ad7738_set_register(conn, portID, slaveID, chipID, 0x38 + ch, 0b01000010)
 
 	time.sleep(0.1)
 	status = ad7738_get_register(conn, portID, slaveID, chipID, 0x20+ ch)
 	val = ad7738_get_register(conn, portID, slaveID, chipID, 0x08 + ch, l=3)
-	#print status >> 5, status & 0b1000, status & 0b100, status & 0b10, status & 0b1, "0x%012X" % val, 1.25 / (2**23) * val
+
 	return val
 
 	
