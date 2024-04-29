@@ -1,0 +1,873 @@
+from . import tofhir2, tofhir2b, config
+import sys, os, tempfile, time
+import numpy as np
+import pandas as pd
+from copy import deepcopy
+import bitarray
+import itertools
+
+def fe_check_current(conn, ts, ILOW, IHIGH, when, fname):
+	results = {}
+	f = open(fname, "w")
+	for m,t in ts:
+		iin = t.get_uut_iin()
+		f.write("%d\t%f\n" % (m,iin))
+		if iin < ILOW:
+			results[m] = [ "UUT CURRENT %s TOO LOW (%5.3f A)" % (when,iin) ]
+
+		elif iin > IHIGH:
+			results[m] = [ "UUT CURRENT %s TOO HIGH (%5.3f A)" % (when, iin) ]
+	f.close()
+	return results
+
+def bga_check_current(conn, sockets, ILOW, IHIGH, when, fname):
+	print "BGA CHECK CURRENT"
+	results = {}
+	f = open(fname, "w")
+	for m, a, t in sockets:
+		iin = t.get_uut_iin(a)
+		f.write("%d\t%d\t%f\n" % (m, a, iin))
+		
+		if iin < ILOW:
+			results[m,a] = [ "UUT CURRENT %s TOO LOW (%5.3f A)" % (when,iin) ]
+
+		elif iin > IHIGH:
+			results[m,a] = [ "UUT CURRENT %s TOO HIGH (%5.3f A)" % (when,iin) ]
+
+	f.close()
+	return results
+	
+def bga_check_reset_n(conn, sockets):
+	print "BGA CHECK RESET"
+	results = {}
+	
+	for m,a,t in sockets:
+		t.set_uut_reset_n(a, 0)
+		
+	conn.initializeSystem()
+	asicsConfig = conn.getAsicsConfig()
+	
+	for m,a,t in sockets:
+		if (0,0,2*m+a) in asicsConfig.keys():
+			results[m,a] = [ "RESET_N FAIL" ]
+
+	for m,a,t in sockets:
+		t.set_uut_reset_n(a, 1)
+
+	return results
+	
+
+def check_asic_communication(conn, sockets):
+	print "CHECK ASIC COMMUNICATION"
+	results = {}
+	conn.initializeSystem()
+	asicsConfig = conn.getAsicsConfig()
+	for m,a,t in sockets:
+		if (0,0,2*m+a) not in asicsConfig.keys():
+			results[m,a] = [ "NO COMMUNICATION" ]
+
+	return results
+
+def bga_do_bg_trim(conn, sockets):
+	print "DO BG TRIM"
+	TRIM_OPTIONS = { 
+		7       : -12.28E-3,
+		6       : -12.32E-3,
+		5       : -12.34E-3,
+		4       : +19.27E-3,
+		3       : +9.73E-3,
+		2       : +4.89E-3,
+		1       : +2.49E-3,
+		0       : +1.25E-3,
+		None    : 0
+	}
+
+	target = 0.300
+
+	for m,a,t in sockets:
+		t.set_uut_vfuse(True)
+	time.sleep(0.1)
+	
+	
+	for m,a,t in sockets:
+		
+		busID = m
+		chipID = a
+		readID = 2*m + a
+		
+		current_trim_options = deepcopy(TRIM_OPTIONS)
+
+		value = t.get_uut_vbg(a)
+		while abs(value - target) > 1E-3:
+			selected_option = None
+			expected_voltage = value + 1E6
+			selected_option_error = abs(value - target)
+			
+			for option, delta in current_trim_options.items():
+
+				# If current value is above target + 4 mV, consider only negative trim options
+				if (value > (target + 4e-3)) and (delta >= 0): continue
+				
+				option_error = abs(value + delta - target)
+				if option_error < selected_option_error:
+					selected_option_error = option_error
+					selected_option = option
+					expected_voltage = value + delta
+			
+			if selected_option is None: break
+			
+			gc = tofhir2b.AsicGlobalConfig()
+			gc.setValue("EFUSE_A", selected_option)
+			conn._Connection__tofhir2_cmd(0, 0, busID, chipID, readID, 32, True, False, gc)              
+			
+			del current_trim_options[selected_option]
+			
+			
+			# Trim
+			conn._Connection__tofhir2_cmd(0, 0, busID, chipID, readID, 37, True, False, bitarray.bitarray(160))
+			time.sleep(0.1)
+			
+			# Load
+			conn._Connection__tofhir2_cmd(0, 0, busID, chipID, readID, 35, True, False, bitarray.bitarray(254))
+			time.sleep(0.1)
+			conn._Connection__tofhir2_cmd(0, 0, busID, chipID, readID, 36, True, False, bitarray.bitarray(254))
+			time.sleep(0.1)
+
+			value = t.get_uut_vbg(a)
+
+	for m,a,t in sockets:
+		t.set_uut_vfuse(False)
+	
+
+
+def bga_check_bg_trim(conn, sockets, fname):
+	print "CHECK BG TRIM"
+	results = {}
+	f = open(fname, "w")
+	for m,a,t in sockets:
+		v = t.get_uut_vbg(a)
+		f.write("%d\t%d\t%f\n" % (m, a, v))
+		if abs(v - 0.300) > 5E-3:
+			results[m,a] = [ "BANDGAP %5.3f OUT OF RANGE" % v ]
+
+	f.close()
+	return results
+
+def check_itrim(conn, sockets, fname):
+	print "CHECK REF CURRENT TRIM"
+	
+	results = {}
+	f = open(fname, "w")
+	conn.initializeSystem()
+	asicsConfig = conn.getAsicsConfig()
+	for m,a,t in sockets:
+		ac = asicsConfig[(0, 0, 2*m+a)]
+		v = ac.globalConfig.getValue("Iref_cal_DAC")
+		f.write("%d\t%d\t%d\n" % (m, a, v))
+		
+	f.close()
+	return results
+
+def bga_check_id(conn, sockets):
+	print "CHECK ASIC ID SETTING"
+	results = {}
+	
+	## Test other communication features
+	## effect of chip ID
+	gc = conn._Connection__asic_module.AsicGlobalConfig()
+	for m,a,t in sockets:
+		for board_id in [  0b1000, 0b100, 0b10, 0b1, 0b0]:
+			try:
+				t.set_uut_board_id(board_id)
+				busID = m
+				chipID = 2*board_id + a
+				readID = 2*m + a
+				conn._Connection__tofhir2_cmd(0, 0, busID, chipID, readID, 32, False, True, gc)
+
+			except tofhir2.ConfigurationError as e:
+				results[m,a] = [ "CHIP_ID FAIL" ]
+				
+	return results
+
+
+def check_rx_phase(conn, sockets, ddir, acquire=True):
+	print "CHECK RX PHASE SELECTION"
+	if acquire:
+		asicsConfig0 = conn.getAsicsConfig()	
+
+		
+		# Determine firmware mode and build global TX config
+		system_mode = conn.read_config_register(0, 0, 16, 0x0104)
+		tdc_clk_div, ddr, tx_nlinks = conn._Connection__getAsicLinkConfiguration(0,0)
+		gctx = conn._Connection__asic_module.AsicGlobalConfigTX()
+		c_tx_mode = 0b0000
+
+		# Select DDR mode
+		if ddr:
+			c_tx_mode |= 0b1000
+		else:
+			c_tx_mode |= 0b0000
+
+		# Select primary/secondary TX
+		if system_mode & 0x300 == 0x000:
+			c_tx_mode |= 0b0000
+		elif system_mode & 0x300 == 0x100:
+			c_tx_mode |= 0b0100
+
+		gctx.setValue("c_tx_mode", c_tx_mode)
+
+		# Select dual TX (for TOFHiR 2B onwards only)
+		if (system_mode & 0xF >= 0x3) and (system_mode & 0x300 == 0x200):
+			gctx.setValue("c_dual", 1)
+
+		gctx.setValue("c_tx_clps", 1023)
+		
+		
+		gc = conn._Connection__asic_module.AsicGlobalConfig()
+		gc.setValue("c_ext_tp_en", 1)
+		cc = conn._Connection__asic_module.AsicChannelConfig()
+		cc.setValue("c_tgr_main", 0b01)
+
+
+		phase_range = 56*6
+
+		cmd_fail_count = pd.DataFrame(0, index=np.arange(0, len(sockets)*phase_range), columns=["phase", "m", "a", "count" ])
+
+		gc = conn._Connection__asic_module.AsicGlobalConfig()
+
+		index = 0
+		for p in range(phase_range):
+			conn.spi_master_execute(0, 0, 0x02, 3,
+				64,
+				1, 63,
+				3, 4,
+				0, 15,
+				0, 15,
+				[0x00, 0x00]
+			);
+
+			phase = float(p)/phase_range
+			conn.set_test_pulse_febds(3, 1024, 0.5, False)
+			
+			
+			chip_communication_failure = dict([ ((m,a),0) for m,a,t in sockets ])
+
+			
+			# Reset the ASICs configuration
+			conn.write_config_register(0, 0, 2, 0x0201, 0b00)
+			for k in range(10):
+				# Generate multiple resets to train the RESYNC receiver
+				conn.write_config_register(0, 0, 1, 0x300, 0b1)
+				conn.write_config_register(0, 0, 1, 0x300, 0b0)
+				
+			time.sleep(0.001)
+
+			for m,a,t in sockets:
+				try:
+					conn._Connection__tofhir2_cmd(0, 0, m, a, 2*m+a, 33, True, False, gctx)
+					conn._Connection__tofhir2_cmd(0, 0, m, a, 2*m+a, 33, True, False, gctx)
+					
+					# And now re-upload the configuration
+					conn._Connection__doAsicCommand(0, 0, 2*m+a, "wrGlobalCfg", value=gc)
+					for channelID in [15]:
+						conn._Connection__doAsicCommand(0, 0, 2*m+a, "wrChCfg", value=cc, channel=channelID)
+								
+			
+					
+				except tofhir2.ConfigurationError:
+					chip_communication_failure[m,a] = 1
+					
+					
+			for m,a,t in sockets:
+				c = chip_communication_failure[m,a]
+				cmd_fail_count.iloc[index] = [phase, m, a, c]
+				index += 1
+							
+
+		cmd_fail_count.to_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t")
+	
+		conn.setTestPulseNone()
+		conn.setAsicsConfig(asicsConfig0)
+
+	
+	def delta(x):
+		return np.max(x) - np.min(x)
+	
+
+	cmd_fail_count = pd.read_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t")
+	cmd_failed = cmd_fail_count.loc[cmd_fail_count["count"] > 0]
+	cmd_failed = cmd_failed.groupby(["m", "a"])["phase"].agg(["min", "max", delta ]).reset_index()
+	cmd_failed = cmd_failed.set_index(['m','a']).T.to_dict()
+
+	results = {}
+	#for (m,a) in cmd_failed.keys():
+			#delta = cmd_failed[(m,a)]['delta']
+			#if delta > 0.050:
+				#results[ int(m), int(a)] = [ "RX PHASE FAIL" ]
+
+	return results
+	
+def check_multiple_links(conn, sockets):
+	print "CHECK MULTIPLE TX LINK MODES"
+	results = {}
+	
+	for mode in [ 0x200, 0x100, 0x000 ]:
+		current_mode = conn.read_config_register(0, 0, 16, 0x0104)
+		current_mode &= ~0x300
+		current_mode |= mode
+		
+		conn.write_config_register(0, 0, 16, 0x0104, current_mode)
+		
+		conn.initializeSystem()
+		asicsConfig0 = conn.getAsicsConfig()
+		asicsConfig = deepcopy(asicsConfig0)
+		for ac in asicsConfig.values():
+			ac.globalConfig.setValue("c_ext_tp_en", 1)
+			ac.channelConfig[15].setValue("c_tgr_main", 0b01)
+		conn.setAsicsConfig(asicsConfig)
+		
+		conn.set_test_pulse_febds(3, 1024, 0.5, False)
+		
+		events = conn.acquireAsPandas(6.25E-9 * 1024 * 1024)
+		event_counts = events.groupby("channelID")["t1Coarse"].agg(["min", "max", "count"]).reset_index()
+				
+		for m,a,t in sockets:
+			channelID = (2*m + a) * 32  + 15
+			try:
+				if event_counts.loc[event_counts["channelID"] == channelID]["count"].min() < 1000:
+					results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL EVT" % mode ]
+			except KeyError:
+				results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL EVT" % mode ]
+			
+			
+			if (0,0,2*m+a) not in asicsConfig.keys():
+				results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL CMD" % mode ]
+
+
+	conn.setTestPulseNone()
+	conn.setAsicsConfig(asicsConfig0)
+	return results
+
+def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
+	print "CHECK DISCRIMINATORS"
+	if mode == "fast":
+		step = 3
+	else:
+		step = 1
+	
+	if acquire:
+		os.system("./acquire_threshold_calibration --no-bias --config /dev/null --lsb %(disc_range)d --step %(step)d -o %(ddir)s/disc_calibration%(disc_range)d" % locals())
+		
+	os.system("./process_threshold_calibration --config %(ddir)s/config.ini -i %(ddir)s/disc_calibration%(disc_range)d -o %(ddir)s/disc_calibration%(disc_range)d.tsv" % locals())
+	
+	df = pd.read_csv("%(ddir)s/disc_calibration%(disc_range)d.tsv" % locals(), sep="\t", header=None, comment="#",
+		names=["port_id", "slave_id", "asic_id", "channel_id", 	"baseline_T", "baseline_E", "zero_T1", "zero_T2", "zero_E", "noise_T1", "noise_T2", "noise_E"]
+	)
+	
+	results = {}
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			asic_id = 2*m + a
+			
+			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
+			
+			try:
+				v = df2["noise_T1"].iloc[0]					
+				if v > 0.8:
+					results[m,a].append("DISC CH %d NOISE T1 %4.1f > 0.8" % (ch, v))
+					continue
+			
+				v = df2["noise_T2"].iloc[0]					
+				if v > 0.8:
+					results[m,a].append("DISC CH %d NOISE T2 %4.1f > 0.8" % (ch, v))
+					continue
+				v = df2["noise_E"].iloc[0]					
+				if v > 2.0:
+					results[m,a].append("DISC CH %d NOISE E %4.1f > 0.8" % (ch, v))
+					continue
+				
+				
+			except IndexError as e:
+				results[m,a].append("DISC CH %d MISSING" % ch)
+				continue
+	
+	return results
+
+def check_tdc(conn, sockets, mode, ddir, acquire=True):
+	print "CHECK TDC"
+	# WARNING:
+	# "mode" is not yet implemented, all acquisitions are done in full
+	
+	if acquire:
+		os.system("./acquire_tdc_calibration --config /dev/null -o %(ddir)s/tdc_calibration" % locals())
+	
+	tmp_dir = tempfile.mkdtemp(suffix="tofhir_bga")
+	os.system("./process_tdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/tdc_calibration -o %(ddir)s/tdc_calibration --tmp-prefix %(tmp_dir)s" % locals())	
+
+	df = pd.read_csv("%(ddir)s/tdc_calibration.tsv" % locals(), sep="\t", header=None, comment="#",
+		names=["port_id", "slave_id", "asic_id", "channel_id", 	"tac_id", "branch_id", "t0", "a0", "a1", "a2", "sigma" ]
+		)
+	
+	results = {}
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			for tac_id in range(8):
+				for branch_id in [1,2]:
+			
+					asic_id = 2*m + a
+					
+					df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch) & (df["tac_id"] == tac_id) & (df["branch_id"] == branch_id)]
+					
+					try:
+						v = df2["a1"].iloc[0]					
+						if v < 400:
+							results[m,a].append("TDC CH %d SLOPE %4.1f  < 500" % (ch, v))
+							continue
+					
+						if v > 700:
+							results[m,a].append("TDC CH %d SLOPE %4.1f  > 600" % (ch, v))
+							continue
+							
+						v = df2["sigma"].iloc[0]					
+						if v > 50.0/6250:
+							results[m,a].append("TDC CH %d RMS %4.1f  > 50ps" % (ch, v*6250))
+							continue
+						
+					except IndexError as e:
+						results[m,a].append("TDC CH %d TAC %d BRANCH %d MISSING" % (ch, tac_id, branch_id))
+						continue
+
+	os.system("rm -rf %(tmp_dir)s" % locals())
+	return results
+
+def check_qdc(conn, sockets, att, mode, ddir, acquire=True):
+	print "CHECK QDC"
+	# WARNING
+	# "mode" is not implemented, all acquisitions are done in full
+	
+	if acquire:
+		os.system("./acquire_qdc_calibration --config /dev/null -o %(ddir)s/qdc_calibration --att %(att)d" % locals())
+	
+	tmp_dir = tempfile.mkdtemp(suffix="tofhir_bga")
+	os.system("./process_qdc_calibration --config %(ddir)s/config.ini -i %(ddir)s/qdc_calibration%(att)d -o %(ddir)s/qdc_calibration%(att)d --tmp-prefix %(tmp_dir)s" % locals())	
+
+	df = pd.read_csv("%(ddir)s/qdc_calibration%(att)d.tsv" % locals(), sep="\t", header=None, comment="#",
+		names=["port_id", "slave_id", "asic_id", "channel_id", 	"tac_id", "trim", "p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "xx", "sigma" ]
+		)
+
+	results = {}
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			for tac_id in range(8):
+				asic_id = 2*m + a
+				
+				df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch) & (df["tac_id"] == tac_id)]
+				
+				try:		
+					#v = df2["sigma"].iloc[0]					
+					#if v > 10.0:
+						#results[m,a].append("QDC CH %d RMS %4.1f  > 10.0" % (ch, v))
+						#continue
+					
+					pass
+				
+					
+				except IndexError as e:
+					results[m,a].append("QDC CH %d TAC %d MISSING" % (ch, tac_id))
+					continue
+
+	os.system("rm -rf %(tmp_dir)s" % locals())
+	return results
+
+
+def setup_xxtp(conn, sockets, att, disc_range, ddir, fetp):
+
+	conn.initializeSystem()
+	conn.setTestPulsePLL(500, 10240, 0.0)
+	
+	asicsConfig = conn.getAsicsConfig()
+	
+	qdcTrim = config.readQDCTrimTable("%(ddir)s/qdc_calibration%(att)d.tsv" % locals())
+	# Fill qdcTrim table with a default value for missing channels
+	for ((p,s,a),ch) in itertools.product(asicsConfig.keys(), [x for x in range(32) ]):
+		if not qdcTrim.has_key((p,s,a,ch)):
+			qdcTrim[p,s,a,ch] = 24	
+	
+	for (p,s,a), ac in asicsConfig.items():
+
+		gc = ac.globalConfig
+		if fetp:
+				gc.setValue("c_ext_tp_en", 1)
+				gc.setValue("c_fetp_en", 1)
+		
+		for ch, cc in enumerate(ac.channelConfig):
+				cc.setValue("cfg_a3_range_t1", disc_range)
+				cc.setValue("cfg_a3_range_t2", 3)
+				cc.setValue("cfg_a3_range_e", 3)
+				cc.setValue("cfg_a3_ith_t1", 63)
+				cc.setValue("cfg_a3_ith_t2", 63)
+				cc.setValue("cfg_a3_ith_e", 63)
+				cc.setValue("c_tgr_main", 0b11)
+				cc.setValue("c_tgr_t1", 0)
+				cc.setValue("c_tgr_q", 0)
+				cc.setValue("c_tgr_t2", 0)
+				cc.setValue("c_tgr_q", 0)
+				cc.setValue("c_tgr_v", 0)
+				cc.setValue("cfg_a2_dcr_delay_t", 0b11111111)
+				cc.setValue("cfg_a2_dcr_delay_e", 0b0111111)
+				cc.setValue("c_min_q", 2)
+				cc.setValue("c_max_q", 2)
+				cc.setValue("cfg_a2_attenuator_gain", att)
+				cc.setValue("cfg_a2_dc_trim", qdcTrim[p,s,a,ch])
+				
+	conn.setAsicsConfig(asicsConfig)
+	
+	_, disc_calibration = config.readDiscCalibrationsTable("%(ddir)s/disc_calibration%(disc_range)d.tsv" % locals())
+	disc_calibration = dict([ ((a, ch), zero_t1) for (p, s, a, ch), (zero_t1, zero_t2, zero_e) in disc_calibration.items() ])
+	
+	# Fill disc calibration table with a default value for missing channels
+	for ((p,s,a),ch) in itertools.product(asicsConfig.keys(), [x for x in range(32) ]):
+		if not disc_calibration.has_key((p,s,a,ch)):
+			disc_calibration[p,s,a,ch] = 56.0
+
+	return disc_calibration
+
+
+
+
+def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
+
+	fName = "%s/fetp_tres_scan" % ddir
+	if acquire:
+			print "TESTING: FETP TRES"
+			disc_calibration = setup_xxtp(conn, sockets, att, 1, ddir, True)
+		
+			asicsConfig0 = conn.getAsicsConfig()
+			
+			conn.openRawAcquisition(fName)
+
+			for ch in range(32):
+				for m,a,t in sockets:
+					t.injector_enable(ch, None, load_only=True)
+				
+
+				for ith in range(2, 64):
+					asicsConfig = deepcopy(asicsConfig0)
+					ith_in_range = False
+					
+					for (p,s,a), ac in asicsConfig.items():
+						gc = ac.globalConfig
+						gc.setValue("Pulse_Amplitude", 31)
+				
+						cc = ac.channelConfig[ch]
+						
+						new_ith = int(disc_calibration[a,ch] + ith)
+						if new_ith < 64:
+							cc.setValue("cfg_a3_ith_t1", new_ith)
+							cc.setValue("cfg_a1_fetp_en", 1)
+							cc.setValue("c_tgr_main", 0b00)
+							ith_in_range = True
+						
+							
+					if not ith_in_range:
+						# There is no ASIC for which ith is <= 63
+						# So we don't need to scan any further
+						break
+					
+					print "FETP TRMS ", ch, ith
+					conn.setAsicsConfig(asicsConfig)
+					conn.acquire(0.1, ch, ith)
+						
+			conn.closeAcquisition()
+			
+			# Disable stuf and return to normal
+			conn.setAsicsConfig(asicsConfig0)
+			for m, a, t in sockets:
+				t.injector_disable()
+	
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	
+	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
+	
+	results = {}
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			asic_id = 2*m + a
+			
+			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
+			
+			try:
+				trms = df2["trms"].iloc[0]
+				
+				if trms == 0:
+					results[m,a].append("FETP CH %d LOW COUNTS" % ch)
+					continue
+					
+				if trms > 50:
+					results[m,a].append("FETP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
+					continue
+
+				
+				
+			except IndexError as e:
+				results[m,a].append("FETP CH %d MISSING" % ch)
+				continue
+				
+	return results
+
+def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
+
+	fName = "%s/fetp_eres_scan" % ddir
+	if acquire:
+			print "TESTING: FETP ERES"
+			disc_calibration = setup_xxtp(conn, sockets, att, 2, ddir, True)
+		
+			asicsConfig0 = conn.getAsicsConfig()
+			
+			conn.openRawAcquisition(fName)
+
+			for ch in range(32):
+				for m,a,t in sockets:
+					t.injector_enable(ch, None, load_only=True)
+				
+				for amp in range(1,32,4):
+					asicsConfig = deepcopy(asicsConfig0)
+					
+					for (p,s,a), ac in asicsConfig.items():
+						gc = ac.globalConfig
+						gc.setValue("Pulse_Amplitude", amp)
+				
+						cc = ac.channelConfig[ch]
+						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 5)
+						cc.setValue("cfg_a1_fetp_en", 1)
+						cc.setValue("c_tgr_main", 0b00)
+
+					print "FETP ERMS ", ch, amp
+					conn.setAsicsConfig(asicsConfig)
+					conn.acquire(0.1, ch, amp)
+						
+			conn.closeAcquisition()
+			
+			# Disable stuf and return to normal
+			conn.setAsicsConfig(asicsConfig0)
+			for m, a, t in sockets:
+				t.injector_disable()
+	
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	
+	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
+	
+	results = {}
+	# TODO
+				
+	return results
+
+
+def check_extp_tres(conn, sockets, att, ddir, acquire=True):
+
+	fName = "%s/extp_tres_scan" % ddir
+	if acquire:
+			print "TESTING: EXTP TRES"
+			disc_calibration = setup_xxtp(conn, sockets, att, 1, ddir, False)
+		
+			asicsConfig0 = conn.getAsicsConfig()
+			
+			conn.openRawAcquisition(fName)
+
+			for ch in range(32):
+				for m,a,t in sockets:
+					t.injector_enable(ch, 0xFFFF)
+				
+
+				for ith in range(2, 64):
+					asicsConfig = deepcopy(asicsConfig0)
+					ith_in_range = False
+					
+					for (p,s,a), ac in asicsConfig.items():
+						cc = ac.channelConfig[ch]
+						
+						new_ith = int(disc_calibration[a,ch] + ith)
+						if new_ith < 64:
+							cc.setValue("cfg_a3_ith_t1", new_ith)
+							cc.setValue("c_tgr_main", 0b00)
+							ith_in_range = True
+						
+							
+					if not ith_in_range:
+						# There is no ASIC for which ith is <= 63
+						# So we don't need to scan any further
+						break
+					
+					print "EXTP TRMS ", ch, ith
+					conn.setAsicsConfig(asicsConfig)
+					conn.acquire(0.1, ch, ith)
+						
+			conn.closeAcquisition()
+			
+			# Disable stuf and return to normal
+			conn.setAsicsConfig(asicsConfig0)
+			for m, a, t in sockets:
+				t.injector_disable()
+	
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	
+	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
+	
+	results = {}
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			asic_id = 2*m + a
+			
+			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
+			
+			try:
+				trms = df2["trms"].iloc[0]
+				
+				if trms == 0:
+					results[m,a].append("EXTP CH %d LOW COUNTS" % ch)
+					continue
+					
+				
+			except IndexError as e:
+				results[m,a].append("EXTP CH %d MISSING" % ch)
+				continue
+				
+	return results
+
+def check_extp_eres(conn, sockets, att, ddir, acquire=True):
+
+	fName = "%s/extp_eres_scan" % ddir
+	if acquire:
+			print "TESTING: EXTP ERES"
+			disc_calibration = setup_xxtp(conn, sockets, att, 2, ddir, False)
+		
+			asicsConfig0 = conn.getAsicsConfig()
+			
+			conn.openRawAcquisition(fName)
+
+			for ch in range(32):
+				for amp in range(1,32,4):
+					for m,a,t in sockets:
+						t.injector_enable(ch, 0x8000 + amp * 0x8000/32)
+
+					
+					asicsConfig = deepcopy(asicsConfig0)
+					
+					for (p,s,a), ac in asicsConfig.items():
+						cc = ac.channelConfig[ch]
+						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 5)
+						cc.setValue("c_tgr_main", 0b00)
+
+					print "EXTP ERMS ", ch, amp
+					conn.setAsicsConfig(asicsConfig)
+					conn.acquire(0.1, ch, amp)
+						
+			conn.closeAcquisition()
+			
+			# Disable stuf and return to normal
+			conn.setAsicsConfig(asicsConfig0)
+			for m, a, t in sockets:
+				t.injector_disable()
+	
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	
+	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
+	
+	results = {}
+	# TODO
+				
+	return results
+
+def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
+	if acquire:
+		print "TESTING: ALDO"
+		asicsConfig0 = conn.getAsicsConfig()
+		
+		f = open("%s/aldo.tsv" % ddir, "w")
+		
+		for aldo_range in [0, 1]:
+			for aldo_dac in [ x for x in range(0, 256, step)] + [ 255]:
+				sys.stdout.write(".")
+				sys.stdout.flush()
+				
+				asicsConfig = deepcopy(asicsConfig0)
+				for ac in asicsConfig.values():
+					gc = ac.globalConfig
+					if aldo_range == 0:
+						gc.setValue("Valdo_A_Gain", 0)
+						gc.setValue("Valdo_B_Gain", 0)
+						gc.setValue("c_aldo_range", 0b00)
+					else:
+						gc.setValue("Valdo_A_Gain", 1)
+						gc.setValue("Valdo_B_Gain", 1)
+						gc.setValue("c_aldo_range", 0b11)
+					
+					gc.setValue("Valdo_A_DAC", aldo_dac)
+					gc.setValue("Valdo_B_DAC", aldo_dac)
+					
+					
+				conn.setAsicsConfig(asicsConfig)
+				
+				for m, a, t in sockets:
+					v = t.get_uut_valdo(a, 0)
+					f.write("%d\t%d\t%d\t%d\t%d\t%f\n" % (m, a, 0, aldo_range, aldo_dac, v))
+					v = t.get_uut_valdo(a, 1)
+					f.write("%d\t%d\t%d\t%d\t%d\t%f\n" % (m, a, 1, aldo_range, aldo_dac, v))
+			
+		
+		sys.stdout.write("\n")
+		f.close()
+		conn.setAsicsConfig(asicsConfig0)
+		
+	df = pd.read_csv("%(ddir)s/aldo.tsv" % locals(), sep="\t", header=None, 
+			names=["module_id", "asic_id", "aldo_id", 
+				"aldo_range", "aldo_dac", "vout" ])
+
+	results = {}			
+	for m,a,t in sockets:
+		results[m,a] = []
+		for aldo_id in range(2):
+			for aldo_range in range(2):
+				df2 = df[(df["module_id"] == m) & (df["asic_id"] == a) & (df["aldo_id"] == aldo_id) & (df["aldo_range"] == aldo_range)]
+				
+				# Exlude top 20% of range
+				df2 = df2[df2["aldo_dac"] < 200]
+				
+				aldo_dac = df2["aldo_dac"]
+				vout = df2["vout"]
+				
+				
+				lower = min(vout)
+				upper = max(vout)
+				slope, b = np.polyfit(aldo_dac, vout, 1)
+				
+				error = vout - (slope * aldo_dac + b)
+				
+				if aldo_range == 0:
+					if (lower < (0.820*expected_slope)) or (upper > (1.0*expected_slope)):
+						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
+						continue
+						
+				else:
+					if (lower < (0.730*expected_slope)) or (upper > (1.0*expected_slope)):
+						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
+						continue
+				
+						
+				max_inl = max(abs(error)) / slope
+				if max_inl > 10:
+					results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f > 10" % locals())
+					continue
+					
+	return results	
+			
+		
