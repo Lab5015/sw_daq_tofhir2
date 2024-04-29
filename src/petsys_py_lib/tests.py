@@ -588,7 +588,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 			for m, a, t in sockets:
 				t.injector_disable()
 	
-	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
 	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
@@ -658,7 +658,7 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
 			for m, a, t in sockets:
 				t.injector_disable()
 	
-	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
 	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
@@ -715,7 +715,7 @@ def check_extp_tres(conn, sockets, att, ddir, acquire=True):
 			for m, a, t in sockets:
 				t.injector_disable()
 	
-	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
 	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
@@ -777,7 +777,7 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 			for m, a, t in sockets:
 				t.injector_disable()
 	
-	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s.root --writeRoot --att %(att)d" % locals())
+	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
 	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
