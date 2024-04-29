@@ -1,0 +1,166 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from petsys import tester_controller, config, spi, tofhir2b, tests
+from copy import deepcopy
+import argparse
+import math
+import time
+import subprocess
+import sys
+import itertools
+import bitarray
+import os
+import pandas as pd
+import numpy as np
+import termios
+import tempfile
+
+
+AUTO_BANDGAP_TRIM = True
+
+def main(argv):
+	parser = argparse.ArgumentParser(description='Test TOFHiR 2 FE')
+	parser.add_argument("-o", type=str, required=True, help="Output directory")
+	parser.add_argument("-n", type=int, default=8, help="Number of FE testers")
+	args = parser.parse_args()
+	
+	os.mkdir(args.o)
+
+	conn = tester_controller.Connection()
+	
+	# Attempt to set system mode to TOFHiR 2C
+	conn.write_config_register(0, 0, 16, 0x0104, 0x0004)
+	
+	# Reset the aux MMCM
+	conn.spi_master_execute(0, 0, 0x02, 4,
+			16,
+			1, 15,
+			3, 4,
+			0, 15,
+			0, 15,
+			[0x00, 0x00]
+		);
+
+
+
+	conn.set_uut_power(False)
+	time.sleep(1.0)
+
+	# Check that we have all expected testers
+	n_testers = len(conn.get_testers().keys())
+	if n_testers != args.n:
+		sys.stderr.write("Expected %d testers, found %d\n" % (args.n, n_testers))
+		exit(1)
+
+
+	uut_failures = {}
+	testers = [ (m,t) for (p,s,m),t in conn.get_testers().items() ]
+	testers = sorted(testers)
+	
+	for m,t in testers:
+		uut_failures[m] = []
+		
+
+	conn.set_uut_power(True)
+	for m,t in testers:
+		uut_on = t.get_uut_power()
+		if not uut_on:
+			# This socket was turned off due to a short circuit
+			uut_failures[m].append("SHORT CIRCUIT")
+			
+	do_tester_check(conn)
+
+	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.020, 0.2, "AFTER POWER UP", os.path.join(args.o, "current_after_power_up.tsv")))
+	testers = disable_failed(testers, uut_failures)
+	
+	
+	# Check that ASICs will perform basic communication
+	uut_failures = merge_failures_MS(uut_failures, tests.check_asic_communication(conn, MS(testers)))
+	testers = disable_failed(testers, uut_failures)
+	
+	# Check that ASIC current draw is within normal range (after initialization)
+	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.8, 1.2, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
+	testers = disable_failed(testers, uut_failures)
+
+	do_tester_check(conn)
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv")))
+	testers = disable_failed(testers, uut_failures)
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers)))
+	testers = disable_failed(testers, uut_failures)
+
+
+	print testers
+	print uut_failures
+	conn.set_uut_power(False)
+	return 0
+
+
+def merge_failures(a, b):
+	c = {}
+	for k in a.keys():
+		c[k] = a[k]
+		if b.has_key(k):
+			a[k] += b[k]
+	
+	return c
+
+
+def disable_failed(testers, uut_failures):
+	for m,t in testers:
+		if uut_failures[m] != []:
+			t.set_uut_power(False)
+
+	result = [ (m,t) for m,t in testers if t.get_uut_power() ]
+	return result
+
+def merge_failures_MS(a, b):
+	c = {}
+	for m in a.keys():
+		c[m] = a[m]
+		for k in [0,1]:
+			if b.has_key((m,k)):
+				a[m] += [ "ASIC %d " % k + failure for failure in b[m,k] ]
+	return c
+
+def MS(testers):
+		return sorted([ (m,a,t) for m,t in testers for a in [0,1] ])
+
+
+def do_tester_check(conn):
+	problems = False
+	for (p,s,m),t in sorted(conn.get_testers().items()):
+		tester_vin = t.get_tester_vin()
+		
+		if tester_vin < 1.6:
+			print "Tester %d Vin %3.2f is LOW" % (m, tester_vin)
+			problems = True
+			
+		if tester_vin > 2.5:			
+			print "Tester %d Vin %3.2f is HIGH" % (m, tester_vin)
+			problems = True
+			
+			
+		# If the UUT has been disabled Vin should be ~0
+		if t.get_uut_power() is False: continue
+		
+		uut_vin = t.get_uut_vin()
+		
+		if uut_vin < 1.6:
+			print "Tester %d UUT Vin %3.2f is LOW" % (m, uut_vin)
+			problems = True
+			
+		if uut_vin > 2.5:
+			print "Tester %d UUT Vin %3.2f is HIGH" % (m, uut_vin)
+			problems = True
+	
+	
+	if problems:
+		print "PROBLEMS FOUND IN TEST SYSTEM"
+		exit(1)
+
+	
+if __name__ == '__main__':
+	exit(main(sys.argv))
