@@ -358,7 +358,7 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 	if acquire:
 		os.system("./acquire_threshold_calibration --no-bias --config /dev/null --lsb %(disc_range)d --step %(step)d -o %(ddir)s/disc_calibration%(disc_range)d" % locals())
 		
-	os.system("./process_threshold_calibration --config %(ddir)s/config.ini -i %(ddir)s/disc_calibration%(disc_range)d -o %(ddir)s/disc_calibration%(disc_range)d.tsv" % locals())
+	os.system("./process_threshold_calibration --step %(step)d --config %(ddir)s/config.ini -i %(ddir)s/disc_calibration%(disc_range)d -o %(ddir)s/disc_calibration%(disc_range)d.tsv" % locals())
 	
 	df = pd.read_csv("%(ddir)s/disc_calibration%(disc_range)d.tsv" % locals(), sep="\t", header=None, comment="#",
 		names=["port_id", "slave_id", "asic_id", "channel_id", 	"baseline_T", "baseline_E", "zero_T1", "zero_T2", "zero_E", "noise_T1", "noise_T2", "noise_E"]
@@ -659,9 +659,9 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
 				t.injector_disable()
 	
 	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
-	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\"\\)""" % locals())
 	
-	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
+	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "b", "m"])
 	
 	results = {}
 	# TODO
@@ -778,9 +778,9 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 				t.injector_disable()
 	
 	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
-	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\"\\)""" % locals())
 	
-	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
+	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "b", "m"])
 	
 	results = {}
 	# TODO

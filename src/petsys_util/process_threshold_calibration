@@ -22,13 +22,23 @@ fSigmoid.SetNpx(64)
 
 
 def getBaselineAndNoise(profile):
-	low = profile.GetBinCenter(profile.FindLastBinAbove(0.9)) - 0.5
-	high = profile.GetBinCenter(profile.FindLastBinAbove(0.1)) + 0.5
+	low = profile.GetBinCenter(max(0,profile.FindLastBinAbove(0.9))) - 0.5
+	high = profile.GetBinCenter(max(0,profile.FindLastBinAbove(0.1))) + 1.5
+
+        plateau_low = max(0,profile.FindLastBinAbove(1-1e-3))
+        plateau_high = max(0,profile.FindLastBinAbove(1e-3)) + 1
+        if plateau_high - plateau_low == 1:
+                zero = (low+high)/2.0
+                noise = 0.2
+                return zero, noise
+        if plateau_high - plateau_low == 2:
+	        fSigmoid.FixParameter(1, 0.2);
+        else:
+                fSigmoid.ReleaseParameter(1);
+	        fSigmoid.SetParameter(1, (high-low)/6.0);
+	        fSigmoid.SetParLimits(1, 0.05, (high-low)/2.0)
 
 	fSigmoid.FixParameter(0, 1.0);
-
-	fSigmoid.SetParameter(1, high-low);
-	fSigmoid.SetParLimits(1, 0.05, high-low)
 
 	fSigmoid.SetParameter(2, (low+high)/2.0)
 	fSigmoid.SetParLimits(2, low, high)
@@ -71,6 +81,7 @@ def main(argv):
 	parser.add_argument("-i", type=str, dest="inputFilePrefix", required=True, help="Data file prefix")
 	parser.add_argument("-o", type=str, dest="outFileName", required=True, help="Output table file name")
 	parser.add_argument("--root-file", dest="rootFileName", help="Output ROOT file name")
+        parser.add_argument("--step", type=int, default=1, help="Scan step")
 	args = parser.parse_args()
 
 
@@ -105,7 +116,8 @@ def main(argv):
 		for thresholdName in ["cfg_a3_ith_t1", "cfg_a3_ith_t2", "cfg_a3_ith_e"]:
 			hName = "hNoise_%02d_%02d_%02d_%02d_%s" % (portID, slaveID, chipID, channelID, thresholdName)
 			hTitle = "Noise (%02d %02d %02d %02d) %s" % (portID, slaveID, chipID, channelID, thresholdName)
-			noiseProfiles[(portID, slaveID, chipID, channelID, thresholdName)] = ROOT.TProfile(hName, hTitle, 64, 0, 64)
+                        nbins = int(63/args.step)+1
+			noiseProfiles[(portID, slaveID, chipID, channelID, thresholdName)] = ROOT.TProfile(hName, hTitle, nbins, 0.5*(1-args.step), 0.5*(1-args.step) + nbins*args.step)
 
 	inputFile = open(args.inputFilePrefix + "_noise.tsv")
 	for line in inputFile:
