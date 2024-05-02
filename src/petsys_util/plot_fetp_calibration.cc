@@ -81,7 +81,7 @@ void plot_fetp_calibration(string filePrefix, int th)
               for (int iTh=0; iTh<16; ++iTh)
                 ht.back().back().push_back( new TH1F(Form("ht_%i_%i",asic.back()*32+iCh,iTh),
                                                     ";ToA [ns]",
-                                                    8000,120,200) );
+                                                    50000,0,500) );
             }
           }
 
