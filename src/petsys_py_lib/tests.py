@@ -554,7 +554,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 					t.injector_enable(ch, None, load_only=True)
 				
 
-				for ith in range(2, 64):
+				for ith in range(10, 64):
 					asicsConfig = deepcopy(asicsConfig0)
 					ith_in_range = False
 					
@@ -643,7 +643,7 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
 						gc.setValue("Pulse_Amplitude", amp)
 				
 						cc = ac.channelConfig[ch]
-						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 5)
+						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 10)
 						cc.setValue("cfg_a1_fetp_en", 1)
 						cc.setValue("c_tgr_main", 0b00)
 
@@ -685,7 +685,7 @@ def check_extp_tres(conn, sockets, att, ddir, acquire=True):
 					t.injector_enable(ch, 0xFFFF)
 				
 
-				for ith in range(2, 64):
+				for ith in range(10, 64):
 					asicsConfig = deepcopy(asicsConfig0)
 					ith_in_range = False
 					
@@ -763,7 +763,7 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 					
 					for (p,s,a), ac in asicsConfig.items():
 						cc = ac.channelConfig[ch]
-						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 5)
+						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 10)
 						cc.setValue("c_tgr_main", 0b00)
 
 					print "EXTP ERMS ", ch, amp
