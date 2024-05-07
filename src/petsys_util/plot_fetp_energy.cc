@@ -96,12 +96,11 @@ void plot_fetp_energy(string filePrefix, Long64_t minTime = 120e3, Long64_t maxT
       }
       auto lin = new TF1(Form("lin%i_%i",iAsic,iCh),"pol1",-.5,31.5);
       lin->SetParameters(-50,12);
-      hene[iAsic][iCh]->Fit(lin,"Q");
+      hene[iAsic][iCh]->Fit(lin,"QN");
       fout<<asic[iAsic]<<"\t"<<iCh<<"\t"<<lin->GetParameter(0)<<"\t"<<lin->GetParameter(1)<<std::endl;
       for (int iBin=1; iBin<=hene[iAsic][iCh]->GetNbinsX(); ++iBin)
         if (hene[iAsic][iCh]->GetBinEntries(iBin)>10)
           fout2<<asic[iAsic]<<"\t"<<iCh<<"\t"<<hene[iAsic][iCh]->GetBinCenter(iBin)<<"\t"<<hene[iAsic][iCh]->GetBinContent(iBin)<<std::endl;
-      if (lin->GetParameter(1)<6) {iCh=32;iAsic=asic.size();}
     }
   }
   

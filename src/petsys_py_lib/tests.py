@@ -664,7 +664,25 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "b", "m"])
 	
 	results = {}
-	# TODO
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			asic_id = 2*m + a
+			
+			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
+			
+			try:
+				eslope = df2["m"].iloc[0]
+				
+				if eslope < 3 or eslope > 13:
+					results[m,a].append("FETP CH %d ENERGY SLOPE %.2f NOT IN [3,13] RANGE" % (ch,eslope))
+					continue
+
+				
+				
+			except IndexError as e:
+				results[m,a].append("FETP CH %d MISSING ENERGY CAL" % ch)
+				continue
 				
 	return results
 
@@ -783,7 +801,25 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "b", "m"])
 	
 	results = {}
-	# TODO
+	for m,a,t in sockets:
+		results[m,a] = []
+		for ch in range(32):
+			asic_id = 2*m + a
+			
+			df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch)]
+			
+			try:
+				eslope = df2["m"].iloc[0]
+				
+				if eslope < 5 or eslope > 35:
+					results[m,a].append("EXTP CH %d ENERGY SLOPE %.2f NOT IN [5,35] RANGE" % (ch,eslope))
+					continue
+
+				
+				
+			except IndexError as e:
+				results[m,a].append("EXTP CH %d MISSING ENERGY CAL" % ch)
+				continue
 				
 	return results
 
@@ -840,11 +876,10 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 				df2 = df[(df["module_id"] == m) & (df["asic_id"] == a) & (df["aldo_id"] == aldo_id) & (df["aldo_range"] == aldo_range)]
 				
 				# Exlude top 20% of range
-				df2 = df2[df2["aldo_dac"] < 200]
+				df2 = df2[df2["aldo_dac"] < 250]
 				
 				aldo_dac = df2["aldo_dac"]
 				vout = df2["vout"]
-				
 				
 				lower = min(vout)
 				upper = max(vout)
