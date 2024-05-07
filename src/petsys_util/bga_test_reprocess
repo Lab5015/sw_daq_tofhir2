@@ -1,0 +1,106 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from petsys import tester_controller, config, spi, tofhir2b, tests
+from copy import deepcopy
+import argparse
+import math
+import time
+import subprocess
+import sys
+import itertools
+import bitarray
+import os, os.path
+import pandas as pd
+import numpy as np
+import termios
+import tempfile
+
+
+AUTO_BANDGAP_TRIM = True
+
+def main(argv):
+	parser = argparse.ArgumentParser(description='Reprocess TOFHiR 2 BGA data')
+	parser.add_argument("-o", type=str, required=True, help="Output directory")
+	args = parser.parse_args()
+
+	if not os.path.isfile(os.path.join(args.o, "results.tsv")):
+		print "This directory does not yet contain a complete acquisition"
+		return 1
+
+	conn = None
+
+	uut_failures = {}
+	
+	sockets = []
+	f = open("%s/reprocess_list.tsv" % args.o, "r")
+	for l in f:
+		l = l[:-1]
+		l = l.split("\t")
+		m, a = [ int(x) for x in l ]
+		sockets.append((m, a, None))
+	sockets = sorted(sockets)
+	
+	for m,a,t in sockets:
+		uut_failures[m,a] = []
+
+
+
+	disc_range_list = { 0b01: "full", 0b10: "full" }
+	qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
+	xxtp_att = 0b011
+	
+	assert xxtp_att in qdc_att_list.keys()
+
+	
+	for disc_range, mode in disc_range_list.items():
+		uut_failures = merge_failures(uut_failures, tests.check_discriminators(conn, sockets, disc_range, mode, args.o, acquire=False))
+		
+	uut_failures = merge_failures(uut_failures, tests.check_tdc(conn, sockets, "full", args.o, acquire=False))
+	
+	for att, mode in qdc_att_list.items():
+		uut_failures = merge_failures(uut_failures, tests.check_qdc(conn, sockets, att, mode, args.o, acquire=False))
+		
+	uut_failures = merge_failures(uut_failures, tests.check_fetp_tres(conn, sockets, xxtp_att, args.o, acquire=False))
+	uut_failures = merge_failures(uut_failures, tests.check_fetp_eres(conn, sockets, xxtp_att, args.o, acquire=False))
+
+	uut_failures = merge_failures(uut_failures, tests.check_extp_tres(conn, sockets, xxtp_att, args.o, acquire=False))
+	uut_failures = merge_failures(uut_failures, tests.check_extp_eres(conn, sockets, xxtp_att, args.o, acquire=False))
+		
+
+	uut_failures = merge_failures(uut_failures, tests.check_aldo(conn, sockets, 7, 1.0, args.o, acquire=False))
+
+
+	detailed_results_file = open("%s/reprocessed_results.tsv" % args.o, "w")
+	
+	for (m, a), failures in uut_failures.items():
+		detailed_results_file.write("%d\t%d\t%s\n" % (m, a, ("\t").join(failures)))
+	
+	detailed_results_file.close()
+	
+
+	print uut_failures
+
+	return 0
+
+
+def merge_failures(a, b):
+	c = {}
+	
+	# Sanity check
+	# If we have a fail report for a previously unknown ASIC
+	# it's most likely a bug in the code
+	for k in b.keys():
+		assert k in a.keys()
+		
+	for k in a.keys():
+		c[k] = a[k]
+		if b.has_key(k):
+			a[k] += b[k]
+	
+	return c
+
+	
+if __name__ == '__main__':
+	exit(main(sys.argv))
+	

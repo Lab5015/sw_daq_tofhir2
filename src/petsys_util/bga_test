@@ -127,11 +127,18 @@ def main(argv):
 	uut_failures = merge_failures(uut_failures, tests.bga_check_id(conn, sockets))
 	sockets = disable_failed(sockets, uut_failures)
 
+	uut_failures = merge_failures(uut_failures, tests.check_multiple_links(conn, sockets))
+	sockets = disable_failed(sockets, uut_failures)
+
+	# Write a list of active sockets up to this point to be used for reprocessing
+	f = open("%s/reprocess_list.tsv" % args.o, "w")
+	for m,a,t in sockets:
+		f.write("%d\t%d\n" % (m, a))
+	f.close()
+
 	uut_failures = merge_failures(uut_failures, tests.check_rx_phase(conn, sockets, args.o))
 	sockets = disable_failed(sockets, uut_failures)
 	
-	uut_failures = merge_failures(uut_failures, tests.check_multiple_links(conn, sockets))
-	sockets = disable_failed(sockets, uut_failures)
 	
 	
 	## Run stuff
