@@ -17,8 +17,6 @@ import termios
 import tempfile
 
 
-AUTO_BANDGAP_TRIM = True
-
 def main(argv):
 	parser = argparse.ArgumentParser(description='Test TOFHiR 2 BGA')
 	parser.add_argument("-o", type=str, required=True, help="Output directory")
@@ -30,20 +28,7 @@ def main(argv):
 	# Set to TRUE to make the BGA pick and place wait for user after each test
 	enable_user_prompt = False
 	
-	if not args.batch:
-		# Manual operation mode
-		trimmed = raw_input("Have these ASICs been trimmed before? (Y/N)")
-		if trimmed in [ 'y', 'Y' ]:
-			do_bg_trim = False
-		elif trimmed in [ 'n', 'N' ]:
-			do_bg_trim = True
-		else:
-			sys.stderr.write("Invalid answer.\n")
-			return 1
-			
-	else:
-		do_bg_trim = AUTO_BANDGAP_TRIM
-
+	do_bg_trim = True
 	os.mkdir(args.o)
 
 	conn = tester_controller.Connection()
@@ -71,17 +56,18 @@ def main(argv):
 
 
 	uut_failures = {}
-	sockets = itertools.product(conn.get_testers().items(), [0, 1])
-	sockets = [ (m,a,t) for ((p, s, m), t), a in sockets ]
-	sockets = sorted(sockets)
+	all_sockets = itertools.product(conn.get_testers().items(), [0, 1])
+	all_sockets = [ (m,a,t) for ((p, s, m), t), a in all_sockets ]
+	all_sockets = sorted(all_sockets)
 	
-	for m,a,t in sockets:
+	for m,a,t in all_sockets:
 		uut_failures[m,a] = []
-
-	for m,a,t in sockets:
 		t.set_leds(a, 0b000)
-	conn.set_uut_power(True)
 
+	conn.set_uut_power(True)
+	
+	# "sockets" will be updated as the script disables sockets with problems
+	sockets = [ (m,a,t) for m,a,t in all_sockets ]
 
 	# ASICs which have been found to be in short circuit will have been powered down
 	for m, a, t in sockets:
@@ -196,6 +182,35 @@ def main(argv):
 	
 	# Test sucessfully complete
 	conn.set_uut_power(False)
+	
+	if not args.batch:
+		for m, a, t in all_sockets:
+			t.set_leds(a, 0)
+			if uut_failures[m,a] != []:
+				t.set_leds(a, 0b001)
+      
+		print """> TRANSFER CHIPS FROM SOCKETS TO "FAILED TRAY/BOX"""
+		print """> SOCKETS INDICATED BY RED LEDs"""
+		print """> PRESS ENTER WHEN DONE"""
+		termios.tcflush(sys.stdin, termios.TCIFLUSH)
+		raw_input()
+		
+
+		for m, a, t in all_sockets:
+			t.set_leds(a, 0)
+			if uut_failures[m,a] == []:
+				t.set_leds(a, 0b010)
+      
+		print """> TRANSFER CHIPS FROM SOCKETS TO "OK TRAY/BOX"""
+		print """> SOCKETS INDICATED BY GREEN LEDs"""
+		print """> PRESS ENTER WHEN DONE"""
+		termios.tcflush(sys.stdin, termios.TCIFLUSH)
+		raw_input()
+		
+		# Disable indicator LEDs
+		for m, a, t in all_sockets:
+			t.set_leds(a, 0)
+	
 
 	if enable_user_prompt and args.batch:
 		# When called by test_bga_auto 
