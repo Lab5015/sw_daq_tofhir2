@@ -147,7 +147,7 @@ def main(argv):
 	os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % args.o)
 
 
-	disc_range_list = { 0b01: "full", 0b10: "full", 0b11 : "fast" }
+	disc_range_list = { 0b01: "full", 0b10: "full" }
 	qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
 	xxtp_att = 0b011
 	extp_amp_list = [ 0xFFFF ]
