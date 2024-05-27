@@ -29,7 +29,7 @@ class Tester(object):
 
 				iin = self.get_uut_iin(k)
 				if iin > 0.6:
-					print "WARNING: Tester (%d, %d, %d) ASIC %d input current is above 0.6 A and will be disabled" % (self.__p, self.__s, self.__m, k, iin)
+					print "WARNING: Tester (%d, %d, %d) ASIC %d input current %3.2f A is above 0.6 A and will be disabled" % (self.__p, self.__s, self.__m, k, iin)
 					self.set_uut_on(k, False)
 					continue
 

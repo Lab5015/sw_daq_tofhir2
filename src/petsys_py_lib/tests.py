@@ -147,7 +147,7 @@ def bga_check_bg_trim(conn, sockets, fname):
 	for m,a,t in sockets:
 		v = t.get_uut_vbg(a)
 		f.write("%d\t%d\t%f\n" % (m, a, v))
-		if abs(v - 0.300) > 5E-3:
+		if abs(v - 0.300) > 6E-3:
 			results[m,a] = [ "BANDGAP %5.3f OUT OF RANGE" % v ]
 
 	f.close()
@@ -192,6 +192,10 @@ def bga_check_id(conn, sockets):
 
 def check_rx_phase(conn, sockets, ddir, acquire=True):
 	print "CHECK RX PHASE SELECTION"
+
+	# This test fails on read_csv if there are no active sockets
+	if sockets == []: return {}
+
 	if acquire:
 		asicsConfig0 = conn.getAsicsConfig()	
 
@@ -284,7 +288,7 @@ def check_rx_phase(conn, sockets, ddir, acquire=True):
 				index += 1
 							
 
-		cmd_fail_count.to_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t")
+		cmd_fail_count.to_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t", encoding="utf-8-sig")
 	
 		conn.setTestPulseNone()
 		conn.setAsicsConfig(asicsConfig0)
@@ -294,16 +298,24 @@ def check_rx_phase(conn, sockets, ddir, acquire=True):
 		return np.max(x) - np.min(x)
 	
 
-	cmd_fail_count = pd.read_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t")
+	cmd_fail_count = pd.read_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t", encoding="utf-8-sig")
 	cmd_failed = cmd_fail_count.loc[cmd_fail_count["count"] > 0]
 	cmd_failed = cmd_failed.groupby(["m", "a"])["phase"].agg(["min", "max", delta ]).reset_index()
 	cmd_failed = cmd_failed.set_index(['m','a']).T.to_dict()
 
 	results = {}
-	#for (m,a) in cmd_failed.keys():
-			#delta = cmd_failed[(m,a)]['delta']
-			#if delta > 0.050:
-				#results[ int(m), int(a)] = [ "RX PHASE FAIL" ]
+	for (m,a) in cmd_failed.keys():
+			min = cmd_failed[(m,a)]['min']
+			if min < 0.075:
+				results[ int(m), int(a)] = [ "RX PHASE FAIL MIN %5.3f < 0.075" % min]
+
+			max = cmd_failed[(m,a)]['max']
+			if max > 0.230:
+				results[ int(m), int(a)] = [ "RX PHASE FAIL MAX %5.3f > 0.230" % max ]
+
+			delta = cmd_failed[(m,a)]['delta']
+			if delta > 0.051:
+				results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.051" % delta]
 
 	return results
 	
@@ -328,13 +340,13 @@ def check_multiple_links(conn, sockets):
 		
 		conn.set_test_pulse_febds(3, 1024, 0.5, False)
 		
-		events = conn.acquireAsPandas(6.25E-9 * 1024 * 1024)
+		events = conn.acquireAsPandas(6.25E-9 * 1024 * 2048)
 		event_counts = events.groupby("channelID")["t1Coarse"].agg(["min", "max", "count"]).reset_index()
 				
 		for m,a,t in sockets:
 			channelID = (2*m + a) * 32  + 15
 			try:
-				if event_counts.loc[event_counts["channelID"] == channelID]["count"].min() < 1000:
+				if event_counts.loc[event_counts["channelID"] == channelID]["count"].min() < 2000:
 					results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL EVT" % mode ]
 			except KeyError:
 				results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL EVT" % mode ]
@@ -364,6 +376,14 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 		names=["port_id", "slave_id", "asic_id", "channel_id", 	"baseline_T", "baseline_E", "zero_T1", "zero_T2", "zero_E", "noise_T1", "noise_T2", "noise_E"]
 	)
 	
+        noisecriteria = {
+                1:[1,0.5,0.3],
+                2:[0.67,0.33,0.3]
+        }
+        zerocriteria = {
+                1:[50,25,8],
+                2:[33,17,5]
+        }
 	results = {}
 	for m,a,t in sockets:
 		results[m,a] = []
@@ -374,17 +394,43 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 			
 			try:
 				v = df2["noise_T1"].iloc[0]					
-				if v > 0.8:
-					results[m,a].append("DISC CH %d NOISE T1 %4.1f > 0.8" % (ch, v))
+				if v > noisecriteria[disc_range][0]:
+					results[m,a].append("DISC CH %d NOISE T1 %4.1f > %4.1f" % (ch, v, noisecriteria[disc_range][0]))
 					continue
-			
 				v = df2["noise_T2"].iloc[0]					
-				if v > 0.8:
-					results[m,a].append("DISC CH %d NOISE T2 %4.1f > 0.8" % (ch, v))
+				if v > noisecriteria[disc_range][1]:
+					results[m,a].append("DISC CH %d NOISE T2 %4.1f > %4.1f" % (ch, v, noisecriteria[disc_range][1]))
 					continue
 				v = df2["noise_E"].iloc[0]					
-				if v > 2.0:
-					results[m,a].append("DISC CH %d NOISE E %4.1f > 0.8" % (ch, v))
+				if v > noisecriteria[disc_range][2]:
+					results[m,a].append("DISC CH %d NOISE E %4.1f > %4.1f" % (ch, v, noisecriteria[disc_range][2]))
+					continue
+				
+				v = df2["zero_T1"].iloc[0]					
+				if v <= 0:
+					results[m,a].append("DISC CH %d BASELINE T1 <= 0")
+					continue
+				
+				if v > zerocriteria[disc_range][0]:
+					results[m,a].append("DISC CH %d BASELINE T1 %4.1f > %4.1f" % (ch, v, zerocriteria[disc_range][0]))
+					continue
+				
+				v = df2["zero_T2"].iloc[0]					
+				if v <= 0:
+					results[m,a].append("DISC CH %d BASELINE T2 <= 0")
+					continue
+				
+				if v > zerocriteria[disc_range][1]:
+					results[m,a].append("DISC CH %d BASELINE T2 %4.1f > %4.1f" % (ch, v, zerocriteria[disc_range][1]))
+					continue
+				
+				v = df2["zero_E"].iloc[0]					
+				if v <= 0:
+					results[m,a].append("DISC CH %d BASELINE E <= 0")
+					continue
+				
+				if v > zerocriteria[disc_range][2]:
+					results[m,a].append("DISC CH %d BASELINE E %4.1f > %4.1f" % (ch, v, zerocriteria[disc_range][2]))
 					continue
 				
 				
@@ -421,19 +467,27 @@ def check_tdc(conn, sockets, mode, ddir, acquire=True):
 					df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch) & (df["tac_id"] == tac_id) & (df["branch_id"] == branch_id)]
 					
 					try:
-						v = df2["a1"].iloc[0]					
-						if v < 400:
-							results[m,a].append("TDC CH %d SLOPE %4.1f  < 500" % (ch, v))
+						v = df2["sigma"].iloc[0]					
+						if v > 62.5/6250:
+							results[m,a].append("TDC CH %d RMS %4.1f > 62.5ps" % (ch, v*6250))
 							continue
-					
-						if v > 700:
-							results[m,a].append("TDC CH %d SLOPE %4.1f  > 600" % (ch, v))
+						
+						a1 = df2["a1"].iloc[0]					
+						if a1 < 440:
+							results[m,a].append("TDC CH %d SLOPE %4.1f  < 440" % (ch, a1))
 							continue
 							
-						v = df2["sigma"].iloc[0]					
-						if v > 50.0/6250:
-							results[m,a].append("TDC CH %d RMS %4.1f  > 50ps" % (ch, v*6250))
+						a0 = df2["a0"].iloc[0]
+                                                maxdac = 1.5 * a1 + a0
+						if maxdac > 1000:
+							results[m,a].append("TDC CH %d MAX DAC %5.0f > 1000" % (ch, maxdac))
 							continue
+						
+						a2 = df2["a2"].iloc[0]
+                                                # deltabin = 1.5 * a1 + a0
+						# if maxdac > 1000:
+						# 	results[m,a].append("TDC CH %d MAX DAC %5.0f > 1000" % (ch, maxdac))
+						# 	continue
 						
 					except IndexError as e:
 						results[m,a].append("TDC CH %d TAC %d BRANCH %d MISSING" % (ch, tac_id, branch_id))
@@ -467,12 +521,22 @@ def check_qdc(conn, sockets, att, mode, ddir, acquire=True):
 				df2 = df[(df["asic_id"] == asic_id) & (df["channel_id"] == ch) & (df["tac_id"] == tac_id)]
 				
 				try:		
-					#v = df2["sigma"].iloc[0]					
-					#if v > 10.0:
-						#results[m,a].append("QDC CH %d RMS %4.1f  > 10.0" % (ch, v))
-						#continue
+					# v = df2["sigma"].iloc[0]					
+					# if v > 10.0:
+					# 	results[m,a].append("QDC CH %d RMS %4.1f  > 10.0" % (ch, v))
+					# 	continue
+
+					p0 = df2["p0"].iloc[0]
+					p1 = df2["p1"].iloc[0]
+
+					if p0 > 100.0:
+						results[m,a].append("QDC CH %d HIGH PEDESTAL P0 %4.0f  > 100.0" % (ch, p0))
+						continue
+					if p1 < -2.0 or p1 > 15:
+						results[m,a].append("QDC CH %d PEDESTAL P1 %4.0f OUT OF RANGE" % (ch, p1))
+						continue
 					
-					pass
+					# pass
 				
 					
 				except IndexError as e:
@@ -589,7 +653,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 				t.injector_disable()
 	
 	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
-	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",10\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
 	
@@ -608,8 +672,8 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 					results[m,a].append("FETP CH %d LOW COUNTS" % ch)
 					continue
 					
-				if trms > 50:
-					results[m,a].append("FETP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
+				if trms > 40:
+					results[m,a].append("FETP CH %d TRMS %4.1f > 40 ps" % (ch, trms))
 					continue
 
 				
@@ -734,7 +798,7 @@ def check_extp_tres(conn, sockets, att, ddir, acquire=True):
 				t.injector_disable()
 	
 	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
-	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",30\\)""" % locals())
+	os.system("""root -b -l -q plot_fetp_calibration.cc+\\(\\"%(fName)s\\",15\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "amplitude", "trms", "emean", "erms"])
 	
@@ -753,6 +817,9 @@ def check_extp_tres(conn, sockets, att, ddir, acquire=True):
 					results[m,a].append("EXTP CH %d LOW COUNTS" % ch)
 					continue
 					
+				if trms > 50:
+					results[m,a].append("EXTP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
+					continue
 				
 			except IndexError as e:
 				results[m,a].append("EXTP CH %d MISSING" % ch)
@@ -886,22 +953,41 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 				slope, b = np.polyfit(aldo_dac, vout, 1)
 				
 				error = vout - (slope * aldo_dac + b)
+				max_inl = max(abs(error)) / slope
 				
 				if aldo_range == 0:
-					if (lower < (0.820*expected_slope)) or (upper > (1.0*expected_slope)):
-						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
+					# if (lower < (0.820*expected_slope)) or (upper > (1.0*expected_slope)):
+					# 	results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
+					# 	continue
+					if (slope < (0.000445*expected_slope)) or (slope > (0.000485*expected_slope)):
+						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
 						continue
+					if (b < (0.78*expected_slope)) or (b > (0.83*expected_slope)):
+						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
+						continue
+				        if max_inl > 2.5:
+					        results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
+					        continue
 						
 				else:
-					if (lower < (0.730*expected_slope)) or (upper > (1.0*expected_slope)):
-						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
+					# if (lower < (0.730*expected_slope)) or (upper > (1.0*expected_slope)):
+					# 	results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
+					# 	continue
+					if (slope < (0.00089*expected_slope)) or (slope > (0.00096*expected_slope)):
+						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
 						continue
+					if (b < (0.71*expected_slope)) or (b > (0.75*expected_slope)):
+						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
+						continue
+				        if max_inl > 5.5:
+					        results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
+					        continue
 				
 						
-				max_inl = max(abs(error)) / slope
-				if max_inl > 10:
-					results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f > 10" % locals())
-					continue
+				# max_inl = max(abs(error)) / slope
+				# if max_inl > 10:
+				# 	results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f > 10" % locals())
+				# 	continue
 					
 	return results	
 			
