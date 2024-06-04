@@ -298,24 +298,40 @@ def check_rx_phase(conn, sockets, ddir, acquire=True):
 		return np.max(x) - np.min(x)
 	
 
+	SPLIT = 0.8
 	cmd_fail_count = pd.read_csv("%s/rx_phase_cmd_fail.tsv" % (ddir,), sep="\t", encoding="utf-8-sig")
-	cmd_failed = cmd_fail_count.loc[cmd_fail_count["count"] > 0]
+	results = {}
+
+
+	# Analsysis step 1: accept up to a single failing phase in the 0.8 .. 1.0 range
+	# a failure here is treated as a 
+	cmd_failed = cmd_fail_count.loc[(cmd_fail_count["count"] > 0) & (cmd_fail_count["phase"] > SPLIT)]
 	cmd_failed = cmd_failed.groupby(["m", "a"])["phase"].agg(["min", "max", delta ]).reset_index()
 	cmd_failed = cmd_failed.set_index(['m','a']).T.to_dict()
-
-	results = {}
 	for (m,a) in cmd_failed.keys():
-			min = cmd_failed[(m,a)]['min']
-			if min < 0.075:
-				results[ int(m), int(a)] = [ "RX PHASE FAIL MIN %5.3f < 0.075" % min]
+		v = cmd_failed[(m,a)]['delta']
+		if v > 0:
+			results[ int(m), int(a)] = [ "RX PHASE FAIL DELTA2 %5.3f > 0.0" % v ]
 
-			max = cmd_failed[(m,a)]['max']
-			if max > 0.230:
-				results[ int(m), int(a)] = [ "RX PHASE FAIL MAX %5.3f > 0.230" % max ]
 
-			delta = cmd_failed[(m,a)]['delta']
-			if delta > 0.051:
-				results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.051" % delta]
+	# Analsysis step 2: apply normal criteria in the 0 .. 0.8 clock cycle range
+	cmd_failed = cmd_fail_count.loc[(cmd_fail_count["count"] > 0) & (cmd_fail_count["phase"] <= SPLIT)]
+	cmd_failed = cmd_failed.groupby(["m", "a"])["phase"].agg(["min", "max", delta ]).reset_index()
+	cmd_failed = cmd_failed.set_index(['m','a']).T.to_dict()
+	for (m,a) in cmd_failed.keys():
+		v = cmd_failed[(m,a)]['min']
+		if v < 0.075:
+			results[ int(m), int(a)] = [ "RX PHASE FAIL MIN %5.3f < 0.075" % v]
+
+		v = cmd_failed[(m,a)]['max']
+		if v > 0.230:
+			results[ int(m), int(a)] = [ "RX PHASE FAIL MAX %5.3f > 0.230" % v ]
+
+		v = cmd_failed[(m,a)]['delta']
+		if v > 0.051:
+			results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.051" % v]
+
+
 
 	return results
 	
