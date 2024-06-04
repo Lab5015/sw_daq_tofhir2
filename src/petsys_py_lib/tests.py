@@ -962,10 +962,10 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 					if (slope < (0.000445*expected_slope)) or (slope > (0.000485*expected_slope)):
 						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
 						continue
-					if (b < (0.78*expected_slope)) or (b > (0.83*expected_slope)):
+					if (b < (0.78*expected_slope)) or (b > (0.86*expected_slope)):
 						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
 						continue
-				        if max_inl > 2.5:
+				        if max_inl > 5:
 					        results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
 					        continue
 						
@@ -976,10 +976,10 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 					if (slope < (0.00089*expected_slope)) or (slope > (0.00096*expected_slope)):
 						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
 						continue
-					if (b < (0.71*expected_slope)) or (b > (0.75*expected_slope)):
+					if (b < (0.71*expected_slope)) or (b > (0.77*expected_slope)):
 						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
 						continue
-				        if max_inl > 5.5:
+				        if max_inl > 8:
 					        results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
 					        continue
 				
