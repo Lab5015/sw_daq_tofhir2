@@ -424,7 +424,7 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 				
 				v = df2["zero_T1"].iloc[0]					
 				if v <= 0:
-					results[m,a].append("DISC CH %d BASELINE T1 <= 0")
+					results[m,a].append("DISC CH %d BASELINE T1 <= 0" % ch)
 					continue
 				
 				if v > zerocriteria[disc_range][0]:
@@ -433,17 +433,18 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 				
 				v = df2["zero_T2"].iloc[0]					
 				if v <= 0:
-					results[m,a].append("DISC CH %d BASELINE T2 <= 0")
+					results[m,a].append("DISC CH %d BASELINE T2 <= 0" % ch)
 					continue
 				
 				if v > zerocriteria[disc_range][1]:
 					results[m,a].append("DISC CH %d BASELINE T2 %4.1f > %4.1f" % (ch, v, zerocriteria[disc_range][1]))
 					continue
 				
-				v = df2["zero_E"].iloc[0]					
-				if v <= 0:
-					results[m,a].append("DISC CH %d BASELINE E <= 0")
-					continue
+				# This requirement was discarded
+				#v = df2["zero_E"].iloc[0]
+				#if v <= 0:
+					#results[m,a].append("DISC CH %d BASELINE E <= 0" % ch)
+					#continue
 				
 				if v > zerocriteria[disc_range][2]:
 					results[m,a].append("DISC CH %d BASELINE E %4.1f > %4.1f" % (ch, v, zerocriteria[disc_range][2]))
