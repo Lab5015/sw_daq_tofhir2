@@ -440,8 +440,8 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 					results[m,a].append("DISC CH %d BASELINE T2 %4.1f > %4.1f" % (ch, v, zerocriteria[disc_range][1]))
 					continue
 				
+				v = df2["zero_E"].iloc[0]
 				# This requirement was discarded
-				#v = df2["zero_E"].iloc[0]
 				#if v <= 0:
 					#results[m,a].append("DISC CH %d BASELINE E <= 0" % ch)
 					#continue
