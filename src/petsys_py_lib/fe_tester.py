@@ -106,13 +106,13 @@ class Tester(object):
 		k2 = (20E3+510E3)/20E3
 
 		adc_channel_map = {
-			(0, "A") : [ (0x3, 9, k1), (0x3, 7, k2) ] + [ (0x6, n, k2) for n in range(16) ],
-			(0, "B") : [ (0x3, 8, k1), (0x3, 6, k2) ]+ [ (0x7, n, k2) for n in range(16) ],
-			(1, "A") : [ (0x3, 10, k1), (0x3, 5, k2) ]+ [ (0x8, n, k2) for n in range(16) ],
-			(1, "B") : [ (0x3, 11, k1), (0x3, 4, k2) ]+ [ (0x9, n, k2) for n in range(16) ],
+			(0, 0) : [ (0x3, 9, k1), (0x3, 7, k2) ] + [ (0x6, n, k2) for n in range(16) ],
+			(0, 1) : [ (0x3, 8, k1), (0x3, 6, k2) ]+ [ (0x7, n, k2) for n in range(16) ],
+			(1, 0) : [ (0x3, 10, k1), (0x3, 5, k2) ]+ [ (0x8, n, k2) for n in range(16) ],
+			(1, 1) : [ (0x3, 11, k1), (0x3, 4, k2) ]+ [ (0x9, n, k2) for n in range(16) ],
 			}
 
-		adc_channels = adc_channel_map [(asic, aOrB.upper())]
+		adc_channels = adc_channel_map [(asic, aOrB)]
 
 		if single_read:
 			chip, channel, k = adc_channels[0]
@@ -145,10 +145,10 @@ class Tester(object):
 
 	def get_bias_current(self, asic, aOrB, single_read=True):
 		adc_channel_map = {
-			(0, "A") : 0,
-			(0, "B") : 1,
-			(1, "A") : 2,
-			(1, "B") : 3
+			(0, 0) : 0,
+			(0, 1) : 1,
+			(1, 0) : 2,
+			(1, 1) : 3
 			}
 
 		adc_channel = adc_channel_map[(asic, aOrB)]
@@ -164,7 +164,7 @@ class Tester(object):
 		spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, 0x8000)
 
 
-	def injector_enable(self, channel, amplitude):
+	def injector_enable(self, channel, amplitude, load_only=False):
 		channel = INJECTOR_CHANNEL_MAP[channel]
 
 		mux_a = channel & 0x7
@@ -173,14 +173,16 @@ class Tester(object):
 		# Clear all injector bits
 		self.__cfg &= ~0b1111111111111110000000000000000000
 
-		self.__cfg |= 0b1100 << 19
+		if not load_only:
+			self.__cfg |= 0b1100 << 19
 		self.__cfg |= mux_a << 23
 		self.__cfg |= mux_sel << 26
 		self.__cfg |= mux_sel << 30
 		spi.spi_reg(self.__conn, 0, 0, 0x10*(self.__m+1)+0, 64, self.__cfg)
 
-		spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 0, amplitude)
-		spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, amplitude)
+		if not load_only:
+			spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 0, amplitude)
+			spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, amplitude)
 
 
 

@@ -57,6 +57,18 @@ def main(argv):
 	uut_failures = {}
 	testers = [ (m,t) for (p,s,m),t in conn.get_testers().items() ]
 	testers = sorted(testers)
+
+	f1 = open("%s/list.txt" % args.o, "w")
+	for m, t in testers:
+		print "FE S/N for port %d?" % m
+		sn = raw_input()
+		sn = sn.upper()
+		f1.write("%d\t%s\n" % (m, sn))
+
+		f2 = open("%s/SN_%s.txt" % (args.o, sn), "w")
+		f2.write("%d\n" % m)
+		f2.close()
+	f1.close()
 	
 	for m,t in testers:
 		uut_failures[m] = []
@@ -88,13 +100,78 @@ def main(argv):
 	uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv")))
 	testers = disable_failed(testers, uut_failures)
 
-	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers)))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_multiple_links(conn, MS(testers)))
 	testers = disable_failed(testers, uut_failures)
 
+	# Write a list of active testers up to this point to be used for reprocessing
+	f = open("%s/reprocess_list.tsv" % args.o, "w")
+	for m,t in testers:
+		f.write("%d\n" % (m))
+	f.close()
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True))
+	testers = disable_failed(testers, uut_failures)
+	
+	uut_failures = merge_failures(uut_failures, tests.check_pt1000(conn, testers, args.o))
+	testers = disable_failed(testers, uut_failures)
+	
+	uut_failures = merge_failures(uut_failures, tests.check_tec(conn, testers, args.o))
+	testers = disable_failed(testers, uut_failures)
+	
+
+	## Run stuff
+	os.system("cp ../config.ini %s" % args.o)
+	os.system("./make_simple_channel_map -o %s/map --port 0 --slave 0 --trigger-port 0" % args.o)
+	os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % args.o)
+
+
+	disc_range_list = { 0 : "full", 1: "full", 2: "full", 3: "full" }
+	#qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
+	qdc_att_list = dict([ ( att, "full") for att in range(8) ])
+	xxtp_att = 0b011
+	extp_amp_list = [ 0xFFFF ]
+	fetp_amp_list = [ v for v in range(3, 32, 4) ]
+	
+	assert xxtp_att in qdc_att_list.keys()
+
+	
+	for disc_range, mode in disc_range_list.items():
+		uut_failures = merge_failures_MS(uut_failures, tests.check_discriminators(conn, MS(testers), disc_range, mode, args.o))
+		
+	uut_failures = merge_failures_MS(uut_failures, tests.check_tdc(conn, MS(testers), "full", args.o))
+	
+	for att, mode in qdc_att_list.items():
+		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o))
+		
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o))
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o))
+		
+
+	# Run test with bias load
+	for m, t in testers: t.enable_bias_voltage_load(True)
+	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+	for m, t in testers: t.enable_bias_voltage_load(False)
+
+	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
+
+	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
+	
+	for m, failures in uut_failures.items():
+		detailed_results_file.write("t%d\t%s\n" % (m, ("\t").join(failures)))
+
+	detailed_results_file.close()
+	
 
 	print testers
 	print uut_failures
-	conn.set_uut_power(False)
+	
+	# Test sucessfully complete
+	conn.set_uut_power(False)	
+
+
 	return 0
 
 
