@@ -190,7 +190,7 @@ def bga_check_id(conn, sockets):
 	return results
 
 
-def check_rx_phase(conn, sockets, ddir, acquire=True):
+def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
 	print "CHECK RX PHASE SELECTION"
 
 	# This test fails on read_csv if there are no active sockets
@@ -293,6 +293,9 @@ def check_rx_phase(conn, sockets, ddir, acquire=True):
 		conn.setTestPulseNone()
 		conn.setAsicsConfig(asicsConfig0)
 
+	# RX phase scan for fe boards needs ranges to be rechecked
+	if fe_mode:
+		return {}
 	
 	def delta(x):
 		return np.max(x) - np.min(x)
@@ -393,12 +396,16 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 	)
 	
         noisecriteria = {
+		0:[64, 64, 64],
                 1:[1,0.5,0.3],
-                2:[0.67,0.33,0.3]
+                2:[0.67,0.33,0.3],
+                3:[64, 64, 64]
         }
         zerocriteria = {
+		0:[64, 64, 64],
                 1:[50,25,8],
-                2:[33,17,5]
+                2:[33,17,5],
+                3:[64,64,64]
         }
 	results = {}
 	for m,a,t in sockets:
@@ -907,7 +914,15 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 				
 	return results
 
-def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
+def value_in(v, limits):
+	l, u = limits
+	return (v >= l) and (v <= u)
+
+def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
+	results = {}
+	for m,a,t in sockets:
+		results[m,a] = []
+
 	if acquire:
 		print "TESTING: ALDO"
 		asicsConfig0 = conn.getAsicsConfig()
@@ -915,7 +930,7 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 		f = open("%s/aldo.tsv" % ddir, "w")
 		
 		for aldo_range in [0, 1]:
-			for aldo_dac in [ x for x in range(0, 256, step)] + [ 255]:
+			for aldo_dac in [ x for x in range(0, 255, step)] + [ 255]:
 				sys.stdout.write(".")
 				sys.stdout.flush()
 				
@@ -930,18 +945,23 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 						gc.setValue("Valdo_A_Gain", 1)
 						gc.setValue("Valdo_B_Gain", 1)
 						gc.setValue("c_aldo_range", 0b11)
-					
+
+					gc.setValue("c_aldo_en", 0b11)
 					gc.setValue("Valdo_A_DAC", aldo_dac)
 					gc.setValue("Valdo_B_DAC", aldo_dac)
 					
 					
 				conn.setAsicsConfig(asicsConfig)
 				
+				# ALDO HV seems to need some time to stabilize
+				if fe_mode and aldo_dac == 0:
+					time.sleep(0.1)
+				
 				for m, a, t in sockets:
-					v = t.get_uut_valdo(a, 0)
-					f.write("%d\t%d\t%d\t%d\t%d\t%f\n" % (m, a, 0, aldo_range, aldo_dac, v))
-					v = t.get_uut_valdo(a, 1)
-					f.write("%d\t%d\t%d\t%d\t%d\t%f\n" % (m, a, 1, aldo_range, aldo_dac, v))
+					for aldo_id in [0, 1]:
+						v = t.get_bias_voltage(a, aldo_id)
+						i = t.get_bias_current(a, aldo_id) if fe_mode else 0.0
+						f.write("%d\t%d\t%d\t%d\t%d\t%f\t%e\n" % (m, a, aldo_id, aldo_range, aldo_dac, v, i))
 			
 		
 		sys.stdout.write("\n")
@@ -950,11 +970,9 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 		
 	df = pd.read_csv("%(ddir)s/aldo.tsv" % locals(), sep="\t", header=None, 
 			names=["module_id", "asic_id", "aldo_id", 
-				"aldo_range", "aldo_dac", "vout" ])
+				"aldo_range", "aldo_dac", "vout", "iout" ])
 
-	results = {}			
 	for m,a,t in sockets:
-		results[m,a] = []
 		for aldo_id in range(2):
 			for aldo_range in range(2):
 				df2 = df[(df["module_id"] == m) & (df["asic_id"] == a) & (df["aldo_id"] == aldo_id) & (df["aldo_range"] == aldo_range)]
@@ -970,42 +988,126 @@ def check_aldo(conn, sockets, step, expected_slope, ddir, acquire=True):
 				slope, b = np.polyfit(aldo_dac, vout, 1)
 				
 				error = vout - (slope * aldo_dac + b)
-				max_inl = max(abs(error)) / slope
-				
-				if aldo_range == 0:
-					# if (lower < (0.820*expected_slope)) or (upper > (1.0*expected_slope)):
-					# 	results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
-					# 	continue
-					if (slope < (0.000445*expected_slope)) or (slope > (0.000485*expected_slope)):
-						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
-						continue
-					if (b < (0.78*expected_slope)) or (b > (0.86*expected_slope)):
-						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
-						continue
-				        if max_inl > 5:
-					        results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
-					        continue
-						
+				max_inl = max(abs(error)) / slope 
+
+
+				if fe_mode == False:
+					if aldo_range == 0:
+						slope_limits = (0.000445, 0.000485)
+						b_limits = (0.78, 0.86)
+						inl_limits = (0, 5)
+					else:
+						slope_limits = (0.00089, 0.00096)
+						b_limits = (0.71, 0.77)
+						inl_limits = (0, 8)
 				else:
-					# if (lower < (0.730*expected_slope)) or (upper > (1.0*expected_slope)):
-					# 	results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d RANGE %(lower)5.3f .. %(upper)5.3f OUT OF BOUNDS" % locals())
-					# 	continue
-					if (slope < (0.00089*expected_slope)) or (slope > (0.00096*expected_slope)):
-						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
-						continue
-					if (b < (0.71*expected_slope)) or (b > (0.77*expected_slope)):
-						results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
-						continue
-				        if max_inl > 8:
-					        results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
-					        continue
+					# Wide values to avoid failures
+					if aldo_range == 0:
+						slope_limits = (0.020, 0.022)
+						b_limits = (37, 39)
+						inl_limits = (0, 15)
+					else:
+						slope_limits = (0.040, 0.042)
+						b_limits = (34, 36)
+						inl_limits = (0, 15)
+
+				if not value_in(slope, slope_limits):
+					results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
+					continue
+
+				if not value_in(b, b_limits):
+					results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d INTERCEPT %(b)5.6f OUT OF BOUNDS" % locals())
+					continue
+
+				if not value_in(max_inl, inl_limits):
+					results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f TOO LARGE" % locals())
+					continue
 				
-						
-				# max_inl = max(abs(error)) / slope
-				# if max_inl > 10:
-				# 	results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d MAX INL %(max_inl)4.1f > 10" % locals())
-				# 	continue
 					
-	return results	
-			
+	return results
+
+
+def check_pt1000(conn, testers, ddir, acquire=True):
+
+	if acquire:
+		f = open("%(ddir)s/pt1000.tsv" % locals(), "w")
+		for m, t in testers:
+			r_list = t.get_pt1000_resistance()
+			for path in [0, 1]:
+				f.write("%d\t%d\t%f\n" % (m, path, r_list[path]))
+
+		f.close()
+
+	df = pd.read_csv("%(ddir)s/pt1000.tsv" % locals(), sep="\t", header=None,
+			names=["module_id", "path_id", "r"])
+
+	return {}
+
+def check_tec(conn, testers, ddir, acquire=True):
+	if acquire:
+		f = open("%(ddir)s/tec.tsv" %locals(), "w")
+		conn.set_tec_power(True)
+		time.sleep(0.1)
+		for m, t in testers:
+			r = t.get_tec_resistance()
+			f.write("%d\t%f\n" % (m, r))
 		
+		f.close()
+		conn.set_tec_power(False)
+
+	df = pd.read_csv("%(ddir)s/tec.tsv" % locals(), sep="\t", header=None,
+			names=["module_id", "r"])
+	return {}
+
+def check_aldo_fe(conn, testers, ddir, acquire=True):
+	results = {}
+	
+	if acquire:
+		df = pd.read_csv("%(ddir)s/aldo.tsv" % locals(), sep="\t", header=None,
+				names=["module_id", "asic_id", "aldo_id",
+					"aldo_range", "aldo_dac", "vout", "iout" ])
+
+		df = df[df["aldo_range"] == 1]
+		df = df.set_index(["module_id", "asic_id", "aldo_id", "aldo_dac"]).T.to_dict()
+
+		f = open("%(ddir)s/aldo_fe.tsv" % locals(), "w")
+
+		asicsConfig0 = conn.getAsicsConfig()
+		for aldo_dac in range(0, 1, 7):
+			asicsConfig = deepcopy(asicsConfig0)
+			for ac in asicsConfig.values():
+				gc = ac.globalConfig
+				gc.setValue("Valdo_A_Gain", 1)
+				gc.setValue("Valdo_B_Gain", 1)
+				gc.setValue("c_aldo_range", 0b11)
+
+				gc.setValue("c_aldo_en", 0b11)
+				gc.setValue("Valdo_A_DAC", aldo_dac)
+				gc.setValue("Valdo_B_DAC", aldo_dac)
+
+
+			conn.setAsicsConfig(asicsConfig)
+
+			# ALDO HV seems to need some time to stabilize
+			if aldo_dac == 0:
+				time.sleep(1)
+
+			for m, t in testers:
+				for asic_id in [0, 1]:
+					for aldo_id in [0, 1]:
+						v_loaded = df[m, asic_id, aldo_id, aldo_dac]["vout"]
+						v_unloaded = t.get_bias_voltage(asic_id, aldo_id)
+						f.write("%d\t%d\t%d\t%d\t%f\t%f\n" % (m, asic_id, aldo_id, aldo_dac, v_loaded, v_unloaded))
+						status = t.check_bias_voltage(asic_id, aldo_id, v_unloaded)
+						if status != []:
+							results[m] = "BIAS PRESENCE CHECK FAILED FOR ASIC %d ALDO %d" % (a, aldo)
+
+		conn.setAsicsConfig(asicsConfig0)
+		f.close()
+
+
+	df = pd.read_csv("%(ddir)s/aldo_fe.tsv" % locals(), sep="\t", header=None,
+				names=["module_id", "asic_id", "aldo_id",
+					"aldo_dac", "v_loaded", "v_unloaded" ])
+
+	return results

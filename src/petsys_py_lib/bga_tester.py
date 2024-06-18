@@ -105,7 +105,7 @@ class Tester(object):
 	def get_uut_vbg(self, k):
 		return self.__adc_read(0x3 + k, 0)
 
-	def get_uut_valdo(self, k, aOrB):
+	def get_bias_voltage(self, k, aOrB):
 		return self.__adc_read(0x3 + k, 2 + aOrB)
 	
 	def get_uut_aldo_en(self, k, aOrB):
