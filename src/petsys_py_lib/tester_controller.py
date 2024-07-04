@@ -59,6 +59,18 @@ class Connection(daqd.Connection):
 			
 		if wait_for_power:
 			time.sleep(1.0)
+			
+			
+	def set_48V_power(self, on):
+		for portID, slaveID in self.getActiveFEBDs():
+			pwr_en =  self.read_config_register(portID, slaveID, 8, 0x0213)
+			if not on:
+				pwr_en &= ~0b0100
+				self.write_config_register(portID, slaveID, 8, 0x0213, pwr_en)
+			else:
+				pwr_en |= 0b0100
+				self.write_config_register(portID, slaveID, 8, 0x0213, pwr_en)
+				time.sleep(0.2)
 
 	def set_tec_power(self, on):
 		for portID, slaveID in self.getActiveFEBDs():

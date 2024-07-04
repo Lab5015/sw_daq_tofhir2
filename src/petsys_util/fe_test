@@ -150,12 +150,14 @@ def main(argv):
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o))
 		
 
-	# Run test with bias load
+	# ALDO tests
+	conn.set_48V_power(True)
 	for m, t in testers: t.enable_bias_voltage_load(True)
 	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+	
 	for m, t in testers: t.enable_bias_voltage_load(False)
-
 	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
+	conn.set_48V_power(False)
 
 	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
 	
