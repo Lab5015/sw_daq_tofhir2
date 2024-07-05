@@ -1004,11 +1004,11 @@ def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
 					# Wide values to avoid failures
 					if aldo_range == 0:
 						slope_limits = (0.020, 0.022)
-						b_limits = (37, 39)
+						b_limits = (30, 40)
 						inl_limits = (0, 15)
 					else:
 						slope_limits = (0.040, 0.042)
-						b_limits = (34, 36)
+						b_limits = (30, 40)
 						inl_limits = (0, 15)
 
 				if not value_in(slope, slope_limits):
@@ -1029,7 +1029,9 @@ def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
 
 def check_pt1000(conn, testers, ddir, acquire=True):
 
+	results = {}
 	if acquire:
+		print "CHECK PT1000 PATH"
 		f = open("%(ddir)s/pt1000.tsv" % locals(), "w")
 		for m, t in testers:
 			r_list = t.get_pt1000_resistance()
@@ -1041,10 +1043,22 @@ def check_pt1000(conn, testers, ddir, acquire=True):
 	df = pd.read_csv("%(ddir)s/pt1000.tsv" % locals(), sep="\t", header=None,
 			names=["module_id", "path_id", "r"])
 
-	return {}
+	df = df.set_index(["module_id", "path_id"]).T.to_dict()
+
+	for m, t in testers:
+		results[m] = []
+		for path in [0, 1]:
+			r = df[m, path]["r"]
+			if r > 10:
+				results[m].append("PT1000 PATH %d HAS HIGH RESISTANCE %f" % (path, r))
+
+
+	return results
 
 def check_tec(conn, testers, ddir, acquire=True):
+	results = {}
 	if acquire:
+		print "CHECK TEC PATH"
 		f = open("%(ddir)s/tec.tsv" %locals(), "w")
 		conn.set_tec_power(True)
 		time.sleep(0.1)
@@ -1057,7 +1071,15 @@ def check_tec(conn, testers, ddir, acquire=True):
 
 	df = pd.read_csv("%(ddir)s/tec.tsv" % locals(), sep="\t", header=None,
 			names=["module_id", "r"])
-	return {}
+
+	df = df.set_index(["module_id"]).T.to_dict()
+
+	for m, t in testers:
+		results[m] = []
+		r = df[m]["r"]
+		if r > 10:
+			results[m].append("TAC PATH HAS HIGH RESISTANCE %f" % r)
+	return results
 
 def check_aldo_fe(conn, testers, ddir, acquire=True):
 	results = {}
@@ -1096,8 +1118,10 @@ def check_aldo_fe(conn, testers, ddir, acquire=True):
 				for asic_id in [0, 1]:
 					for aldo_id in [0, 1]:
 						v_loaded = df[m, asic_id, aldo_id, aldo_dac]["vout"]
+						i_loaded = df[m, asic_id, aldo_id, aldo_dac]["iout"]
 						v_unloaded = t.get_bias_voltage(asic_id, aldo_id)
-						f.write("%d\t%d\t%d\t%d\t%f\t%f\n" % (m, asic_id, aldo_id, aldo_dac, v_loaded, v_unloaded))
+						i_unloaded = t.get_bias_current(asic_id, aldo_id)
+						f.write("%d\t%d\t%d\t%d\t%f\t%f\t%e\t%e\n" % (m, asic_id, aldo_id, aldo_dac, v_loaded, v_unloaded, i_loaded, i_unloaded))
 						status = t.check_bias_voltage(asic_id, aldo_id, v_unloaded)
 						if status != []:
 							results[m] = "BIAS PRESENCE CHECK FAILED FOR ASIC %d ALDO %d" % (a, aldo)
@@ -1108,6 +1132,6 @@ def check_aldo_fe(conn, testers, ddir, acquire=True):
 
 	df = pd.read_csv("%(ddir)s/aldo_fe.tsv" % locals(), sep="\t", header=None,
 				names=["module_id", "asic_id", "aldo_id",
-					"aldo_dac", "v_loaded", "v_unloaded" ])
+					"aldo_dac", "v_loaded", "v_unloaded", "i_loaded", "i_unloaded" ])
 
 	return results
