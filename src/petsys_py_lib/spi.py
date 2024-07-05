@@ -135,14 +135,6 @@ def adc7738_calibrate(conn, portID, slaveID, chipID):
 
 	ad7738_set_register(conn, portID, slaveID, chipID, 0x38 + 0b111, 0b10000010)
 	time.sleep(0.1)
-	#print "ADC ZS = 0x%06X" % ad7738_get_register(conn, portID, slaveID, chipID, 0x06, l=3)
-	#print "ADC FS = 0x%06X" % ad7738_get_register(conn, portID, slaveID, chipID, 0x07, l=3)
-
-	#for ch in range(8):
-		#print "CH%d ZS = 0x%06X" % (ch, ad7738_get_register(conn, portID, slaveID, chipID, 0x10+ch, l=3))
-		#print "CH%d FS = 0x%06X" % (ch, ad7738_get_register(conn, portID, slaveID, chipID, 0x18+ch, l=3))
-	
-
 	return None
 		
 
