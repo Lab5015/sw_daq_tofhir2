@@ -88,7 +88,7 @@ void plot_fetp_calibration(string filePrefix, int th)
         hamp[iAsic][channelID%32]->Fill(step2);
         hene[iAsic][channelID%32]->Fill(energy);
         if ( step2-th >= 0 && step2-th < ht[iAsic][channelID%32].size() )
-        ht[iAsic][channelID%32][step2-th]->Fill((time%10000000)/1000.);
+        ht[iAsic][channelID%32][step2-th]->Fill((time%640000000)/1000.);
 
        }
 
@@ -107,7 +107,7 @@ void plot_fetp_calibration(string filePrefix, int th)
 
   for (unsigned iAsic=0; iAsic<asic.size(); ++iAsic) {
     for (int iCh=0; iCh<32; ++iCh) {
-      if (ht[iAsic][iCh][0]->GetEntries()<25) {
+      if ((ht[iAsic][iCh][0]->GetEntries()<25) && (ht[iAsic][iCh][10]->GetEntries()<25)) {
         fout<<asic[iAsic]<<"\t"<<iCh<<"\t0\t0\t0\t0"<<std::endl;
         continue;
        }

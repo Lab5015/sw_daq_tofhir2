@@ -1,0 +1,126 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from petsys import tester_controller, config, spi, tofhir2b, tests
+from copy import deepcopy
+import argparse
+import math
+import time
+import subprocess
+import sys
+import itertools
+import bitarray
+import os
+import pandas as pd
+import numpy as np
+import termios
+import tempfile
+
+
+
+AUTO_BANDGAP_TRIM = True
+
+def main(argv):
+	parser = argparse.ArgumentParser(description='Reprocess test of TOFHiR 2 FE')
+	parser.add_argument("-o", type=str, required=True, help="Output directory")
+	args = parser.parse_args()
+	
+	if not os.path.isfile(os.path.join(args.o, "detailed_results.tsv")):
+		print "This directory does not yet contain a complete acquisition"
+		return 1
+
+	conn = None
+
+	uut_failures = {}
+	
+	testers = []
+	f = open("%s/reprocess_list.tsv" % args.o, "r")
+	for l in f:
+		l = l[:-1]
+		m = int(l)
+		testers.append((m,  None))
+	testers = sorted(testers)
+	
+	for m,t in testers:
+		uut_failures[m] = []
+		
+		
+		
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True, acquire=False))
+	
+	uut_failures = merge_failures(uut_failures, tests.check_pt1000(conn, testers, args.o, acquire=False))
+	
+	uut_failures = merge_failures(uut_failures, tests.check_tec(conn, testers, args.o, acquire=False))
+	
+	disc_range_list = { 0 : "full", 1: "full", 2: "full", 3: "full" }
+	#qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
+	qdc_att_list = dict([ ( att, "full") for att in range(8) ])
+	xxtp_att = 0b011
+	extp_amp_list = [ 0xFFFF ]
+	fetp_amp_list = [ v for v in range(3, 32, 4) ]
+	
+	assert xxtp_att in qdc_att_list.keys()
+
+	
+	for disc_range, mode in disc_range_list.items():
+		uut_failures = merge_failures_MS(uut_failures, tests.check_discriminators(conn, MS(testers), disc_range, mode, args.o, acquire=False))
+		
+	uut_failures = merge_failures_MS(uut_failures, tests.check_tdc(conn, MS(testers), "full", args.o, acquire=False))
+	
+	for att, mode in qdc_att_list.items():
+		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o, acquire=False))
+		
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+		
+
+	# ALDO tests
+	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True, acquire=False))
+	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o, acquire=False))
+
+	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
+	
+	for m, failures in uut_failures.items():
+		detailed_results_file.write("t%d\t%s\n" % (m, ("\t").join(failures)))
+
+	detailed_results_file.close()
+	
+
+	print testers
+	print uut_failures
+	
+
+	return 0
+
+
+def merge_failures(a, b):
+	c = {}
+	for k in a.keys():
+		c[k] = a[k]
+		if b.has_key(k):
+			a[k] += b[k]
+	
+	return c
+
+
+def merge_failures_MS(a, b):
+	c = {}
+	for m in a.keys():
+		c[m] = a[m]
+		for k in [0,1]:
+			if b.has_key((m,k)):
+				a[m] += [ "ASIC %d " % k + failure for failure in b[m,k] ]
+	return c
+
+def MS(testers):
+		return sorted([ (m,a,t) for m,t in testers for a in [0,1] ])
+
+
+
+	
+if __name__ == '__main__':
+	exit(main(sys.argv))

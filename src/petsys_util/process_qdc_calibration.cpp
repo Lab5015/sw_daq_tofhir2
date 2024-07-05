@@ -780,7 +780,7 @@ void writeCalibrationTable(CalibrationEntry *calibrationTable, const char *outpu
                 exit(1);
 	}
 
-	fprintf(f, "# portID\tslaveID\tchipID\tchannelID\ttacID\ttrim\tp0\tp1\tp2\tp3\tp4\tp5\tp6\tp7\tp8\tsigma\n");
+	fprintf(f, "# portID\tslaveID\tchipID\tchannelID\ttacID\ttrim\tp0\tp1\tp2\tp3\tp4\tp5\tp6\tp7\tp8\tp9\tsigma\n");
 
 	for(unsigned long gid = 0; gid < MAX_N_QAC; gid++) {
 		CalibrationEntry &entry = calibrationTable[gid];
