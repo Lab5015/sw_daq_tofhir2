@@ -43,9 +43,9 @@ def main(argv):
 	
 	for m,t in testers:
 		uut_failures[m] = []
-		
-		
-		
+
+	# TODO
+	#uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv"), acquire=False))
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True, acquire=False))
 	
@@ -82,7 +82,7 @@ def main(argv):
 	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True, acquire=False))
 	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o, acquire=False))
 
-	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
+	detailed_results_file = open("%s/reprocessed_results.tsv" % args.o, "w")
 	
 	for m, failures in uut_failures.items():
 		detailed_results_file.write("t%d\t%s\n" % (m, ("\t").join(failures)))
