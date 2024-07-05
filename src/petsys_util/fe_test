@@ -61,6 +61,7 @@ def main(argv):
 	f1 = open("%s/list.txt" % args.o, "w")
 	for m, t in testers:
 		print "FE S/N for port %d?" % m
+		termios.tcflush(sys.stdin, termios.TCIFLUSH)
 		sn = raw_input()
 		sn = sn.upper()
 		f1.write("%d\t%s\n" % (m, sn))
@@ -97,9 +98,6 @@ def main(argv):
 
 	do_tester_check(conn)
 
-	uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv")))
-	testers = disable_failed(testers, uut_failures)
-
 	uut_failures = merge_failures_MS(uut_failures, tests.check_multiple_links(conn, MS(testers)))
 	testers = disable_failed(testers, uut_failures)
 
@@ -109,20 +107,44 @@ def main(argv):
 		f.write("%d\n" % (m))
 	f.close()
 
-	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True))
-	testers = disable_failed(testers, uut_failures)
-	
+	uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv")))
+
+	# Run test with bias load
+	for m, t in testers: t.enable_bias_voltage_load(True)
+	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+	for m, t in testers: t.enable_bias_voltage_load(False)
+
+	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
+
 	uut_failures = merge_failures(uut_failures, tests.check_pt1000(conn, testers, args.o))
-	testers = disable_failed(testers, uut_failures)
-	
+
 	uut_failures = merge_failures(uut_failures, tests.check_tec(conn, testers, args.o))
-	testers = disable_failed(testers, uut_failures)
-	
 
 	## Run stuff
 	os.system("cp ../config.ini %s" % args.o)
 	os.system("./make_simple_channel_map -o %s/map --port 0 --slave 0 --trigger-port 0" % args.o)
 	os.system("./tester_read_dc --no-power-up | tee %s/dc.txt" % args.o)
+
+
+	# Give the user the chance to abort before longer tests start
+	if uut_failures != []:
+		print "Some boards have failures"
+		for m, s in uut_failures.items():
+			print m, s
+
+		print "Abort? (Y/N)"
+		termios.tcflush(sys.stdin, termios.TCIFLUSH)
+		abort = raw_input().upper()
+
+		if abort == "Y":
+			conn.set_uut_power(False)
+			return 0
+
+
+
+
+	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True))
+	testers = disable_failed(testers, uut_failures)
 
 
 	disc_range_list = { 0 : "full", 1: "full", 2: "full", 3: "full" }
@@ -150,12 +172,7 @@ def main(argv):
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o))
 		
 
-	# Run test with bias load
-	for m, t in testers: t.enable_bias_voltage_load(True)
-	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
-	for m, t in testers: t.enable_bias_voltage_load(False)
 
-	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
 
 	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
 	
