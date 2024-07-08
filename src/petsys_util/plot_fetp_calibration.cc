@@ -39,6 +39,9 @@ void plot_fetp_calibration(string filePrefix, int th)
   vector<vector<vector<TH1F*>>> ht (0);
   vector<unsigned> asic (0);
 
+  int timemax = 250;
+  int nThs = 32;
+
   while (fscanf(indexFile, "%lu\t%lu\t%f\t%f\n", &stepBegin, &stepEnd, &step1, &step2) == 4) {
 
     if (fabs(step1-65535)>0.1 && step1>31) continue;
@@ -56,14 +59,16 @@ void plot_fetp_calibration(string filePrefix, int th)
         float energy = buffer[k].e;
         Long64_t time = buffer[k].time;
         uint channelID = buffer[k].id;
-
+	Long64_t timemod = (time%64000000);
+	if (timemod/1000.>timemax)
+	  continue;
 
 
 
         unsigned iAsic=0;
         for (; iAsic<asic.size(); ++iAsic)
-        if (asic[iAsic]==(channelID/32))
-          break;
+	  if (asic[iAsic]==(channelID/32))
+	    break;
 
         if (iAsic==asic.size()) {
           asic.push_back(channelID/32);
@@ -72,33 +77,33 @@ void plot_fetp_calibration(string filePrefix, int th)
           ht.push_back( vector<vector<TH1F*>>(0) );
           for (int iCh=0; iCh<32; ++iCh) {
             hamp.back().push_back( new TH1F(Form("hamp_%i",asic.back()*32+iCh),
-              ";threshold [DAC]",
-              64,-.5,63.5) );
+					    ";threshold [DAC]",
+					    64,-.5,63.5) );
             hene.back().push_back( new TH1F(Form("hene_%i",asic.back()*32+iCh),
-              ";energy [DAC]",
-              950,49.5,999.5) );
+					    ";energy [DAC]",
+					    950,49.5,999.5) );
             ht.back().push_back( vector<TH1F*>(0) );
-            for (int iTh=0; iTh<16; ++iTh)
-            ht.back().back().push_back( new TH1F(Form("ht_%i_%i",asic.back()*32+iCh,iTh),
-              ";ToA [ns]",
-              50000,0,500) );
-           }
-         }
+            for (int iTh=0; iTh<nThs; ++iTh)
+	      ht.back().back().push_back( new TH1F(Form("ht_%i_%i",asic.back()*32+iCh,iTh),
+						   ";ToA [ns]",
+						   timemax*100,0,timemax) );
+	  }
+	}
 
         hamp[iAsic][channelID%32]->Fill(step2);
         hene[iAsic][channelID%32]->Fill(energy);
         if ( step2-th >= 0 && step2-th < ht[iAsic][channelID%32].size() )
-        ht[iAsic][channelID%32][step2-th]->Fill((time%640000000)/1000.);
+	  ht[iAsic][channelID%32][step2-th]->Fill(timemod/1000.);
 
-       }
+      }
 
       stepBegin += readCount * sizeof(Event);
 
-     }
+    }
 
 
 
-   }
+  }
 
   delete [] buffer;
 
@@ -110,24 +115,24 @@ void plot_fetp_calibration(string filePrefix, int th)
       if ((ht[iAsic][iCh][0]->GetEntries()<25) && (ht[iAsic][iCh][10]->GetEntries()<25)) {
         fout<<asic[iAsic]<<"\t"<<iCh<<"\t0\t0\t0\t0"<<std::endl;
         continue;
-       }
+      }
       float vamp = 0;
       float target = 0.5*hamp[iAsic][iCh]->GetBinContent(th+1);
       for (int iBin=hamp[iAsic][iCh]->GetNbinsX(); iBin>0; --iBin)
-      if (hamp[iAsic][iCh]->GetBinContent(iBin)>target) {
-        float dNlow = hamp[iAsic][iCh]->GetBinContent(iBin)-target;
-        float dNhig = target-hamp[iAsic][iCh]->GetBinContent(iBin+1);
-        vamp = 1.25 * (hamp[iAsic][iCh]->GetBinCenter(iBin) + dNlow / (dNlow+dNhig));
-        break;
-       }
+	if (hamp[iAsic][iCh]->GetBinContent(iBin)>target) {
+	  float dNlow = hamp[iAsic][iCh]->GetBinContent(iBin)-target;
+	  float dNhig = target-hamp[iAsic][iCh]->GetBinContent(iBin+1);
+	  vamp = 1.25 * (hamp[iAsic][iCh]->GetBinCenter(iBin) + dNlow / (dNlow+dNhig));
+	  break;
+	}
       float enemean = hene[iAsic][iCh]->GetMean();
       float eneRMS = hene[iAsic][iCh]->GetRMS();
       float bestreso = 999;
       for (unsigned iTh=0; iTh<ht[iAsic][iCh].size(); ++iTh)
-      if (ht[iAsic][iCh][iTh]->GetEntries()>25 && bestreso > ht[iAsic][iCh][iTh]->GetRMS())
-      bestreso = ht[iAsic][iCh][iTh]->GetRMS();
+	if (ht[iAsic][iCh][iTh]->GetEntries()>25 && bestreso > ht[iAsic][iCh][iTh]->GetRMS())
+	  bestreso = ht[iAsic][iCh][iTh]->GetRMS();
       fout<<asic[iAsic]<<"\t"<<iCh<<"\t"<<vamp<<"\t"<<1000*bestreso<<"\t"<<enemean<<"\t"<<eneRMS<<std::endl;
-     }
-   }
+    }
+  }
 
 }
