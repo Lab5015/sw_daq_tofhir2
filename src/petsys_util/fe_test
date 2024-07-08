@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 import termios
 import tempfile
+from DS18B20_temperature_sensor import read_temperature_probe1, read_temperature_probe2
 
 
 AUTO_BANDGAP_TRIM = True
@@ -173,9 +174,16 @@ def main(argv):
 		
 
 	# ALDO tests
+	read_temperature_probe1(args.o, "probe_1_before_aldo_scan")
+	read_temperature_probe2(args.o, "probe_2_before_aldo_scan")
+
 	conn.set_48V_power(True)
 	for m, t in testers: t.enable_bias_voltage_load(True)
 	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+
+	read_temperature_probe1(args.o, "probe_1_after_aldo_scan")
+	read_temperature_probe2(args.o, "probe_2_after_aldo_scan")
+
 	for m, t in testers: t.enable_bias_voltage_load(False)
 	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
 	conn.set_48V_power(False)
