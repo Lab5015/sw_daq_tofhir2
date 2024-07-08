@@ -396,16 +396,16 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 	)
 	
         noisecriteria = {
-		0:[64, 64, 64],
+		0:[2, 1, 0.6],
                 1:[1,0.5,0.3],
                 2:[0.67,0.33,0.3],
-                3:[64, 64, 64]
+                3:[0.5, 0.25, 0.3]
         }
         zerocriteria = {
-		0:[64, 64, 64],
+		0:[100, 50, 16],
                 1:[50,25,8],
                 2:[33,17,5],
-                3:[64,64,64]
+                3:[25, 13, 4]
         }
 	results = {}
 	for m,a,t in sockets:
