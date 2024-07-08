@@ -93,7 +93,7 @@ def main(argv):
 	testers = disable_failed(testers, uut_failures)
 	
 	# Check that ASIC current draw is within normal range (after initialization)
-	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.8, 1.2, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
+	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.7, 0.9, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
 	testers = disable_failed(testers, uut_failures)
 
 	do_tester_check(conn)
