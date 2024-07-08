@@ -626,7 +626,7 @@ def setup_xxtp(conn, sockets, att, disc_range, ddir, fetp):
 
 
 
-def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
+def check_fetp_tres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/fetp_tres_scan" % ddir
 	if acquire:
@@ -639,7 +639,9 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 
 			for ch in range(32):
 				for m,a,t in sockets:
-					t.injector_enable(ch, None, load_only=True)
+					# Injector as loads seem to create problems in FE testers
+					if not fe_mode:
+						t.injector_enable(ch, None, load_only=True)
 				
 
 				for ith in range(10, 64):
@@ -708,7 +710,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 				
 	return results
 
-def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
+def check_fetp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/fetp_eres_scan" % ddir
 	if acquire:
@@ -721,7 +723,9 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
 
 			for ch in range(32):
 				for m,a,t in sockets:
-					t.injector_enable(ch, None, load_only=True)
+					# Injector as loads seem to create problems in FE testers
+					if not fe_mode:
+						t.injector_enabe(ch, None, load_only=True)
 				
 				for amp in range(1,32,4):
 					asicsConfig = deepcopy(asicsConfig0)

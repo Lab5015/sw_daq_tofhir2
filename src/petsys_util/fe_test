@@ -145,8 +145,6 @@ def main(argv):
 
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True))
-	testers = disable_failed(testers, uut_failures)
-
 
 	disc_range_list = { 0 : "full", 1: "full", 2: "full", 3: "full" }
 	#qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
@@ -166,8 +164,8 @@ def main(argv):
 	for att, mode in qdc_att_list.items():
 		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o))
 		
-	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o))
-	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o))
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o))
