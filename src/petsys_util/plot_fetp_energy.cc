@@ -14,7 +14,7 @@ struct Event {
   int id;  
 } __attribute__((__packed__));
 
-void plot_fetp_energy(string filePrefix, Long64_t minTime = 120e3, Long64_t maxTime = 250e3)
+void plot_fetp_energy(string filePrefix, Long64_t minTime = 120e3, Long64_t maxTime = 250e3, bool cleanFETP = false)
 {
   string indexFileName = filePrefix + ".lidx";
   auto indexFile = fopen(indexFileName.c_str(), "r");
@@ -56,7 +56,13 @@ void plot_fetp_energy(string filePrefix, Long64_t minTime = 120e3, Long64_t maxT
         
         
         if (energy<30 || energy>1000) continue;
-        if (time%64000000<minTime || time%64000000>maxTime) continue;
+
+	// remove entries due to fetp noise in extp acquisition
+        if (cleanFETP && step2>20 && energy<150) continue;
+
+	// patch for channels in which the tp is delayed 51.2 us
+        if (time%12800000<minTime || time%12800000>maxTime) continue;
+        // if (time%64000000<minTime || time%64000000>maxTime) continue;
         
         unsigned iAsic=0;
         for (; iAsic<asic.size(); ++iAsic)
