@@ -158,15 +158,15 @@ def check_itrim(conn, sockets, fname, acquire=True):
 	
 	results = {}
         if acquire:
-	        f = open(fname, "w")
-	        conn.initializeSystem()
-	        asicsConfig = conn.getAsicsConfig()
-	        for m,a,t in sockets:
-		        ac = asicsConfig[(0, 0, 2*m+a)]
-		        v = ac.globalConfig.getValue("Iref_cal_DAC")
-		        f.write("%d\t%d\t%d\n" % (m, a, v))
-		
-	                f.close()
+			f = open(fname, "w")
+			conn.initializeSystem()
+			asicsConfig = conn.getAsicsConfig()
+			for m,a,t in sockets:
+				ac = asicsConfig[(0, 0, 2*m+a)]
+				v = ac.globalConfig.getValue("Iref_cal_DAC")
+				f.write("%d\t%d\t%d\n" % (m, a, v))
+
+			f.close()
         
 	return results
 
