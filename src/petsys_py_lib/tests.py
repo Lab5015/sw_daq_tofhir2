@@ -547,24 +547,24 @@ def check_qdc(conn, sockets, att, mode, ddir, acquire=True):
 				try:		
 					# v = df2["sigma"].iloc[0]					
 					# if v > 10.0:
-					# 	results[m,a].append("QDC CH %d RMS %4.1f  > 10.0" % (ch, v))
+					# 	results[m,a].append("QDC CH %d ATT %d RMS %4.1f  > 10.0" % (ch, att, v))
 					# 	continue
 
 					p0 = df2["p0"].iloc[0]
 					p1 = df2["p1"].iloc[0]
 
 					if p0 > 100.0:
-						results[m,a].append("QDC CH %d HIGH PEDESTAL P0 %4.0f  > 100.0" % (ch, p0))
+						results[m,a].append("QDC CH %d ATT %d HIGH PEDESTAL P0 %4.0f  > 100.0" % (ch, att, p0))
 						continue
 					if p1 < -2.0 or p1 > 15:
-						results[m,a].append("QDC CH %d PEDESTAL P1 %4.0f OUT OF RANGE" % (ch, p1))
+						results[m,a].append("QDC CH %d ATT %d PEDESTAL P1 %4.0f OUT OF RANGE" % (ch, att, p1))
 						continue
 					
 					# pass
 				
 					
 				except IndexError as e:
-					results[m,a].append("QDC CH %d TAC %d MISSING" % (ch, tac_id))
+					results[m,a].append("QDC CH %d ATT %d TAC %d MISSING" % (ch, att, tac_id))
 					continue
 
 	os.system("rm -rf %(tmp_dir)s" % locals())
