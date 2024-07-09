@@ -191,7 +191,7 @@ def main(argv):
 	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
 	
 	for m, failures in uut_failures.items():
-		detailed_results_file.write("t%d\t%s\n" % (m, ("\t").join(failures)))
+		detailed_results_file.write("%d\t%s\n" % (m, ("\t").join(failures)))
 
 	detailed_results_file.close()
 	
