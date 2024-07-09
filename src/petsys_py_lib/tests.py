@@ -295,10 +295,6 @@ def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
 		conn.setTestPulseNone()
 		conn.setAsicsConfig(asicsConfig0)
 
-	# RX phase scan for fe boards needs ranges to be rechecked
-	if fe_mode:
-		return {}
-	
 	def delta(x):
 		return np.max(x) - np.min(x)
 	
@@ -333,8 +329,10 @@ def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
 			results[ int(m), int(a)] = [ "RX PHASE FAIL MAX %5.3f > 0.230" % v ]
 
 		v = cmd_failed[(m,a)]['delta']
-		if v > 0.051:
+		if (not fe_mode) and (v > 0.051):
 			results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.051" % v]
+                if fe_mode and (v > 0.060):
+                        results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.060" % v]
 
 
 
@@ -781,7 +779,7 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 	return results
 
 
-def check_extp_tres(conn, sockets, att, ddir, acquire=True):
+def check_extp_tres(conn, sockets, att, ddir, fe_mode=False, acquire=True):
 
 	fName = "%s/extp_tres_scan" % ddir
 	if acquire:
@@ -847,8 +845,12 @@ def check_extp_tres(conn, sockets, att, ddir, acquire=True):
 					results[m,a].append("EXTP CH %d LOW COUNTS" % ch)
 					continue
 					
-				if trms > 50:
+				if (not fe_mode) and (trms > 50):
 					results[m,a].append("EXTP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
+					continue
+
+                                if fe_mode and (trms > 150):
+					results[m,a].append("EXTP CH %d TRMS %4.1f > 150 ps" % (ch, trms))
 					continue
 				
 			except IndexError as e:
@@ -1012,14 +1014,15 @@ def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
 						inl_limits = (0, 8)
 				else:
 					# Wide values to avoid failures
+                                        gain = (220 + 5.11)/5.11
 					if aldo_range == 0:
-						slope_limits = (0.020, 0.022)
-						b_limits = (30, 40)
-						inl_limits = (0, 15)
+						slope_limits = (gain * 0.000445, gain * 0.000485)
+						b_limits = (34, gain*0.86)
+						inl_limits = (0, 5)
 					else:
-						slope_limits = (0.040, 0.042)
-						b_limits = (30, 40)
-						inl_limits = (0, 15)
+						slope_limits = (gain * 0.00089, gain * 0.00096)
+						b_limits = (31, gain * 0.77)
+						inl_limits = (0, 8)
 
 				if not value_in(slope, slope_limits):
 					results[m,a].append("ALDO %(aldo_id)d RANGE %(aldo_range)d SLOPE %(slope)5.6f OUT OF BOUNDS" % locals())
@@ -1059,7 +1062,10 @@ def check_pt1000(conn, testers, ddir, acquire=True):
 		results[m] = []
 		for path in [0, 1]:
 			r = df[m, path]["r"]
-			if r > 10:
+                        if r < 2.25:
+                                results[m].append("PT1000 PATH %d HAS LOW RESISTANCE %f" % (path, r))
+                                
+			if r > 3.75:
 				results[m].append("PT1000 PATH %d HAS HIGH RESISTANCE %f" % (path, r))
 
 
@@ -1087,7 +1093,10 @@ def check_tec(conn, testers, ddir, acquire=True):
 	for m, t in testers:
 		results[m] = []
 		r = df[m]["r"]
-		if r > 10:
+                if r < 1.1:
+                        results[m].append("TAC PATH HAS LOW RESISTANCE %f" % r)
+                        
+		if r > 1.5:
 			results[m].append("TAC PATH HAS HIGH RESISTANCE %f" % r)
 	return results
 

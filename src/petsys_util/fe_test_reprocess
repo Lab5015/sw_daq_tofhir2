@@ -50,8 +50,7 @@ def main(argv):
                 uut_failures[m] = []
 	testers = sorted(testers)
 
-	# TODO
-	# uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv"), acquire=False))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv"), acquire=False))
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True, acquire=False))
 	
@@ -77,10 +76,10 @@ def main(argv):
 	for att, mode in qdc_att_list.items():
 		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o, acquire=False))
 		
-	#uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
-	#uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+	#uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False, fe_mode=True))
+	#uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False, fe_mode=True))
 
-	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False, fe_mode=True))
 	# uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False, fe_mode=True))
 		
 

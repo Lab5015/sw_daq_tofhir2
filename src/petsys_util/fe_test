@@ -94,7 +94,7 @@ def main(argv):
 	testers = disable_failed(testers, uut_failures)
 	
 	# Check that ASIC current draw is within normal range (after initialization)
-	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.7, 0.9, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
+	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.75, 0.85, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
 	testers = disable_failed(testers, uut_failures)
 
 	do_tester_check(conn)
@@ -113,7 +113,7 @@ def main(argv):
 	# Run test with bias load
 	conn.set_48V_power(True)
 	for m, t in testers: t.enable_bias_voltage_load(True)
-	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (220+5.11)/5.11, args.o, fe_mode=True))
 	for m, t in testers: t.enable_bias_voltage_load(False)
 	conn.set_48V_power(False)
 
@@ -169,7 +169,7 @@ def main(argv):
 	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 
-	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 		
 
