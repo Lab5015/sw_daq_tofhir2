@@ -61,10 +61,17 @@ def main(argv):
 
 	f1 = open("%s/list.txt" % args.o, "w")
 	for m, t in testers:
-		print "FE S/N for port %d?" % m
-		termios.tcflush(sys.stdin, termios.TCIFLUSH)
-		sn = raw_input()
-		sn = sn.upper()
+		BAD_SN = "6959"
+		sn = BAD_SN
+		while sn == BAD_SN:
+			print "FE S/N for port %d?" % m
+			termios.tcflush(sys.stdin, termios.TCIFLUSH)
+			sn = raw_input()
+			sn = sn.upper()
+			
+			if sn == BAD_SN:
+				print "INVALID SERIAL NUMBER: ", sn
+			
 		f1.write("%d\t%s\n" % (m, sn))
 
 		f2 = open("%s/SN_%s.txt" % (args.o, sn), "w")
