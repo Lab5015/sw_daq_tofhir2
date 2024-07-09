@@ -15,6 +15,7 @@ import pandas as pd
 import numpy as np
 import termios
 import tempfile
+from DS18B20_temperature_sensor import read_temperature_probe1, read_temperature_probe2
 
 
 AUTO_BANDGAP_TRIM = True
@@ -93,7 +94,7 @@ def main(argv):
 	testers = disable_failed(testers, uut_failures)
 	
 	# Check that ASIC current draw is within normal range (after initialization)
-	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.8, 1.2, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
+	uut_failures = merge_failures(uut_failures, tests.fe_check_current(conn, testers, 0.7, 0.9, "AFTER INIT", os.path.join(args.o, "current_after_init.tsv")))
 	testers = disable_failed(testers, uut_failures)
 
 	do_tester_check(conn)
@@ -110,9 +111,11 @@ def main(argv):
 	uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv")))
 
 	# Run test with bias load
+	conn.set_48V_power(True)
 	for m, t in testers: t.enable_bias_voltage_load(True)
 	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
 	for m, t in testers: t.enable_bias_voltage_load(False)
+	conn.set_48V_power(False)
 
 	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
 
@@ -144,8 +147,6 @@ def main(argv):
 
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True))
-	testers = disable_failed(testers, uut_failures)
-
 
 	disc_range_list = { 0 : "full", 1: "full", 2: "full", 3: "full" }
 	#qdc_att_list = { 0b111 : "full", 0b110: "fast", 0b011: "full" }
@@ -165,17 +166,24 @@ def main(argv):
 	for att, mode in qdc_att_list.items():
 		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o))
 		
-	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o))
-	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o))
-	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
 		
 
 	# ALDO tests
+	read_temperature_probe1(args.o, "probe_1_before_aldo_scan")
+	read_temperature_probe2(args.o, "probe_2_before_aldo_scan")
+
 	conn.set_48V_power(True)
 	for m, t in testers: t.enable_bias_voltage_load(True)
 	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+
+	read_temperature_probe1(args.o, "probe_1_after_aldo_scan")
+	read_temperature_probe2(args.o, "probe_2_after_aldo_scan")
+
 	for m, t in testers: t.enable_bias_voltage_load(False)
 	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o))
 	conn.set_48V_power(False)

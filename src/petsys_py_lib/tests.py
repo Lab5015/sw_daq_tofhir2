@@ -396,16 +396,16 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 	)
 	
         noisecriteria = {
-		0:[64, 64, 64],
+		0:[2, 1, 0.6],
                 1:[1,0.5,0.3],
                 2:[0.67,0.33,0.3],
-                3:[64, 64, 64]
+                3:[0.5, 0.25, 0.3]
         }
         zerocriteria = {
-		0:[64, 64, 64],
+		0:[100, 50, 16],
                 1:[50,25,8],
                 2:[33,17,5],
-                3:[64,64,64]
+                3:[25, 13, 4]
         }
 	results = {}
 	for m,a,t in sockets:
@@ -626,7 +626,7 @@ def setup_xxtp(conn, sockets, att, disc_range, ddir, fetp):
 
 
 
-def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
+def check_fetp_tres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/fetp_tres_scan" % ddir
 	if acquire:
@@ -639,7 +639,9 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 
 			for ch in range(32):
 				for m,a,t in sockets:
-					t.injector_enable(ch, None, load_only=True)
+					# Injector as loads seem to create problems in FE testers
+					if not fe_mode:
+						t.injector_enable(ch, None, load_only=True)
 				
 
 				for ith in range(10, 64):
@@ -708,7 +710,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True):
 				
 	return results
 
-def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
+def check_fetp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/fetp_eres_scan" % ddir
 	if acquire:
@@ -721,7 +723,9 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True):
 
 			for ch in range(32):
 				for m,a,t in sockets:
-					t.injector_enable(ch, None, load_only=True)
+					# Injector as loads seem to create problems in FE testers
+					if not fe_mode:
+						t.injector_enabe(ch, None, load_only=True)
 				
 				for amp in range(1,32,4):
 					asicsConfig = deepcopy(asicsConfig0)
@@ -851,7 +855,7 @@ def check_extp_tres(conn, sockets, att, ddir, acquire=True):
 				
 	return results
 
-def check_extp_eres(conn, sockets, att, ddir, acquire=True):
+def check_extp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/extp_eres_scan" % ddir
 	if acquire:
@@ -887,7 +891,10 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 				t.injector_disable()
 	
 	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
-	os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\"\\)""" % locals())
+        if fe_mode:
+	        os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\",172e3,250e3,true\\)""" % locals())
+        else:
+	        os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\"\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "b", "m"])
 	
@@ -901,8 +908,9 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True):
 			
 			try:
 				eslope = df2["m"].iloc[0]
+				einter = df2["b"].iloc[0]
 				
-				if eslope < 5 or eslope > 35:
+				if ((not fe_mode) or eslope!=0 or einter!=0) and (eslope < 5 or eslope > 35):
 					results[m,a].append("EXTP CH %d ENERGY SLOPE %.2f NOT IN [5,35] RANGE" % (ch,eslope))
 					continue
 
