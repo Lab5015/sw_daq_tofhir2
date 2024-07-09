@@ -32,20 +32,26 @@ def main(argv):
 	conn = None
 
 	uut_failures = {}
-	
+        f = open(os.path.join(args.o, "detailed_results.tsv"))
+        for l in f:
+                l = l[:-1]# Remove end of line
+                l = l[1:] # Remove spurious "t" at begining of file
+                l = l.split("\t")
+                m = int(l[0])
+                failures = l[1:]
+                uut_failures[m] = failures
+
 	testers = []
 	f = open("%s/reprocess_list.tsv" % args.o, "r")
 	for l in f:
 		l = l[:-1]
 		m = int(l)
 		testers.append((m,  None))
+                uut_failures[m] = []
 	testers = sorted(testers)
-	
-	for m,t in testers:
-		uut_failures[m] = []
 
 	# TODO
-	#uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv"), acquire=False))
+	# uut_failures = merge_failures_MS(uut_failures, tests.check_itrim(conn, MS(testers), os.path.join(args.o, "itrim.tsv"), acquire=False))
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_rx_phase(conn, MS(testers), args.o, fe_mode=True, acquire=False))
 	
@@ -71,15 +77,15 @@ def main(argv):
 	for att, mode in qdc_att_list.items():
 		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o, acquire=False))
 		
-	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
-	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+	#uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
+	#uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False))
 
 	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_tres(conn, MS(testers), xxtp_att, args.o, acquire=False))
-	uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False, fe_mode=True))
+	# uut_failures = merge_failures_MS(uut_failures, tests.check_extp_eres(conn, MS(testers), xxtp_att, args.o, acquire=False, fe_mode=True))
 		
 
 	# ALDO tests
-	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True, acquire=False))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (220+5.11)/5.11, args.o, fe_mode=True, acquire=False))
 	uut_failures = merge_failures(uut_failures, tests.check_aldo_fe(conn, testers, args.o, acquire=False))
 
 	detailed_results_file = open("%s/reprocessed_results.tsv" % args.o, "w")

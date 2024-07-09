@@ -179,7 +179,7 @@ def main(argv):
 
 	conn.set_48V_power(True)
 	for m, t in testers: t.enable_bias_voltage_load(True)
-	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (237+5.11)/5.11, args.o, fe_mode=True))
+	uut_failures = merge_failures_MS(uut_failures, tests.check_aldo(conn, MS(testers), 1, (220+5.11)/5.11, args.o, fe_mode=True))
 
 	read_temperature_probe1(args.o, "probe_1_after_aldo_scan")
 	read_temperature_probe2(args.o, "probe_2_after_aldo_scan")
