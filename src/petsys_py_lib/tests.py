@@ -153,19 +153,21 @@ def bga_check_bg_trim(conn, sockets, fname):
 	f.close()
 	return results
 
-def check_itrim(conn, sockets, fname):
+def check_itrim(conn, sockets, fname, acquire=True):
 	print "CHECK REF CURRENT TRIM"
 	
 	results = {}
-	f = open(fname, "w")
-	conn.initializeSystem()
-	asicsConfig = conn.getAsicsConfig()
-	for m,a,t in sockets:
-		ac = asicsConfig[(0, 0, 2*m+a)]
-		v = ac.globalConfig.getValue("Iref_cal_DAC")
-		f.write("%d\t%d\t%d\n" % (m, a, v))
+        if acquire:
+	        f = open(fname, "w")
+	        conn.initializeSystem()
+	        asicsConfig = conn.getAsicsConfig()
+	        for m,a,t in sockets:
+		        ac = asicsConfig[(0, 0, 2*m+a)]
+		        v = ac.globalConfig.getValue("Iref_cal_DAC")
+		        f.write("%d\t%d\t%d\n" % (m, a, v))
 		
-	f.close()
+	                f.close()
+        
 	return results
 
 def bga_check_id(conn, sockets):
