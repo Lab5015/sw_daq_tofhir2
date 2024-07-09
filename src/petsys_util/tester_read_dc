@@ -13,6 +13,9 @@ import sys
 def ffmt(v):
 	return "%0.3f" % v
 
+def ffmt2(v):
+	return "%4.1f" % v
+
 def main():
 	conn = tester_controller.Connection()
 	parser = argparse.ArgumentParser(description='Read tester DC values')
@@ -60,8 +63,8 @@ def main():
 	
 	if isinstance(tt[0], fe_tester.Tester):
 		output_file.write("Tester Vin (V):\t%s\n" % ("\t").join([ ffmt(t.get_tester_vin()) for t in tt ]))
-		output_file.write("Tester Temp 0 (ºC):\t%s\n" % ("\t").join([ "NaN" for t in tt ]))
-		output_file.write("Tester Temp 1 (ºC):\t%s\n" % ("\t").join([ "NaN" for t in tt ]))
+		output_file.write("Tester Temp top (ºC):\t%s\n" % ("\t").join([ ffmt2(t.get_temperature("top")) for t in tt ]))
+		output_file.write("Tester Temp bot (ºC):\t%s\n" % ("\t").join([ ffmt2(t.get_temperature("bottom")) for t in tt ]))
 		output_file.write("UUT Vin (V):\t%s\n" % ("\t").join([ ffmt(t.get_uut_vin()) for t in tt ]))
 		output_file.write("UUT Iin (A):\t%s\n" % ("\t").join([ ffmt(t.get_uut_iin()) for t in tt ]))
 		output_file.write("UUT Vdd0  (V):\t%s\n" % ("\t").join([ ffmt(t.get_uut_1V2(0)) for t in tt ]))
