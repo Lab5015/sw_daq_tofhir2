@@ -1,5 +1,6 @@
 from tester_common import TesterPowerException
 import spi
+import i2c
 import time
 
 class Tester(object):
@@ -185,6 +186,11 @@ class Tester(object):
 			spi.dac_set(self.__conn, 0, 0, 0x10*(self.__m+1) + 2, 1, amplitude)
 
 
+	def get_temperature(self, which):
+		chip_ids = {  "top" : 0b1001001, "bottom": 0b1001000 }
+		chip_id = chip_ids[which]
+		bus_id = 0x10*(self.__m+1) + 0xA
+		return i2c.tmp1075_read(self.__conn, 0, 0, bus_id, chip_id)
 
 
 INJECTOR_CHANNEL_MAP = {0: 26, 1: 25, 2: 31, 3: 27, 4: 24, 5: 16, 6: 30, 7: 29, 8: 18, 9: 28, 10: 23, 11: 17, 12: 19, 13: 20, 14: 22, 15: 21, 16: 9, 17: 8, 18: 10, 19: 11, 20: 15, 21: 13, 22: 0, 23: 14, 24: 6, 25: 5, 26: 12, 27: 1, 28: 2, 29: 4, 30: 7, 31: 3}

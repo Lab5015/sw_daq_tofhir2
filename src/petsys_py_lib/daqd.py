@@ -732,7 +732,8 @@ class Connection(object):
 		word0 = (busID >> 8) & 0xFF
 		word1 = (busID >> 0) & 0xFF
 
-		r = self.sendCommand(portID, slaveID, 4, bytes([word0, word1] + s))
+		command = bytearray([word0, word1] + s)
+		r = self.sendCommand(portID, slaveID, 4, command)
 
 		status = r[0]
 		error = (status & 0xE0) != 0
