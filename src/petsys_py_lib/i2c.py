@@ -252,25 +252,17 @@ def tmp1075_read(conn, portID, slaveID, busID, chipID, debug_error=True):
     reading = 0
     sequence = []
     ack_position = []
+    read_position = []
 
-    # Start condition
-    sequence += [ 0b1111, 0b1101, 0b1100 ]
 
-    # Read address
-    chipID = (chipID << 1) | 0b1
-    # Write chip address byte
-    for n in range(7, -1, -1):
-        sda = (chipID >> n) & 0x1
-        sda = sda << 1
-        sequence += [ 0b1100 | sda, 0b1101 | sda, 0b1100 ]
+    ## Start condition
+    #sequence += [ 0b1111, 0b1101, 0b1100 ]
 
-    sequence += [ 0b0110, 0b0111, 0b0110 ]
-    ack_position += [ len(sequence) - 2 ]
-
-    ## Wirte register pointer
-    #regID = 0x00
+    ## Write address
+    #i2c_addr = (chipID << 1) | 0b0
+    ## Write chip address byte
     #for n in range(7, -1, -1):
-        #sda = (regID >> n) & 0x1
+        #sda = (i2c_addr >> n) & 0x1
         #sda = sda << 1
         #sequence += [ 0b1100 | sda, 0b1101 | sda, 0b1100 ]
 
@@ -278,22 +270,52 @@ def tmp1075_read(conn, portID, slaveID, busID, chipID, debug_error=True):
     #ack_position += [ len(sequence) - 2 ]
 
 
+    #reg_addr = 0x00
+    ## Write chip address byte
+    #for n in range(7, -1, -1):
+        #sda = (reg_addr >> n) & 0x1
+        #sda = sda << 1
+        #sequence += [ 0b1100 | sda, 0b1101 | sda, 0b1100 ]
+
+    #sequence += [ 0b0110, 0b0111, 0b0110 ]
+    #ack_position += [ len(sequence) - 2 ]
+
+    ## Stop condition
+    #sequence+= [ 0b0100, 0b0001, 0b0011 ]
+
+
+
+
+    # Start condition
+    sequence += [ 0b1111, 0b1101, 0b1100 ]
+
+    # Read address
+    i2c_addr = (chipID << 1) | 0b1
+    # Write chip address byte
+    for n in range(7, -1, -1):
+        sda = (i2c_addr >> n) & 0x1
+        sda = sda << 1
+        sequence += [ 0b1100 | sda, 0b1101 | sda, 0b0100 | sda]
+
+    sequence += [0b0110, 0b0111, 0b0110 ]
+    ack_position += [ len(sequence) - 2 ]
+
     # Read 1st byte
     read_start_bit = len(sequence) - 1
     for n in range(7, -1, -1):
         sequence += [ 0b0110 , 0b0111 , 0b0110 ]
+	read_position += [ len(sequence) - 2 ]
     read_end_bit = len(sequence) - 1
     # Master NACK
-    sequence += [ 0b1110, 0b1111, 0b1100 ]
-    #ack_position += [ len(sequence) - 2 ]
+    sequence += [ 0b1100, 0b1101, 0b1100 ]
 
     # Read 2nd byte
     for n in range(7, -1, -1):
         sequence += [ 0b0110 , 0b0111 , 0b0110 ]
+	read_position += [ len(sequence) - 2 ]
     read_end_bit = len(sequence) - 1
     # Master NACK
-    sequence += [ 0b1110, 0b1111, 0b1100 ]
-    #ack_position += [ len(sequence) - 2 ]
+    sequence += [ 0b1100, 0b1101, 0b1100 ]
 
     # Stop condition
     sequence+= [ 0b0100, 0b0001, 0b0011 ]
@@ -313,11 +335,11 @@ def tmp1075_read(conn, portID, slaveID, busID, chipID, debug_error=True):
 
         print "\nSCL IN ", ("").join([ "‾" if (x & 0b01) != 0 else "_" for x in reply ])
         print "\nSDA IN ", ("").join([ "‾" if (x & 0b10) != 0 else "_" for x in reply ])
-        print "\nACK    ", ("").join([ "|" if k in ack_position else " " for k in range(len(reply)) ])
+        print "\nACK    ", ("").join([ "A" if k in ack_position else " " for k in range(len(reply)) ])
+        print "\nREAD   ", ("").join([ "R" if k in read_position else " " for k in range(len(reply)) ])
         print "ERROR  ", ("").join([ "E" if (x & 0xE0) != 0 else "." for x in reply ])
         #print [ "%02X" % x for x in reply ]
-        print "%4.0f us" % (1e6 * len(sequence) * 100e-9 * 2**5)
-        print "%4.0f us" % (1e6 * 3*9 * 10e-6)
+        print "%4.0f us" % (4 * len(sequence))
         print "%4.0f us" % (1e6 * dt)
 
     if True in error:
@@ -328,14 +350,16 @@ def tmp1075_read(conn, portID, slaveID, busID, chipID, debug_error=True):
     if False in ack:
         raise NoAck(portID, slaveID, busID)
 
-    sda_in = [ (x & 0b10) >> 1 for x in reply[read_start_bit:read_end_bit:3]]
-    for bit in sda_in[1:]:
+    #sda_in = [ (x & 0b10) >> 1 for x in reply[read_start_bit:read_end_bit:3]]
+    sda_in = [ (reply[k] & 0b10) >> 1 for k in read_position ]
+    for bit in sda_in:
         reading = (reading << 1) | bit
 
-    reading = reading >> 5
+    reading = reading >> 4
     if reading > 0x7FF:
         # Negative number in 2's complement
         reading = -(~(0xFFF - 1) & 0xFFF)
+
     return reading * 0.0625
 
 

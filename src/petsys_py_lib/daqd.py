@@ -732,13 +732,17 @@ class Connection(object):
 		word0 = (busID >> 8) & 0xFF
 		word1 = (busID >> 0) & 0xFF
 
-		command = bytearray([word0, word1] + s)
+		s2 = []
+		for e in s:
+			s2 += [ e, e, e, e]
+
+		command = bytearray([word0, word1] + s2)
 		r = self.sendCommand(portID, slaveID, 4, command)
 
 		status = r[0]
 		error = (status & 0xE0) != 0
 
-		return r
+		return r[3::4]
 
 	
 	def spi_master_execute(self, portID, slaveID, cfgFunctionID, chipID, cycle_length, sclk_en_on, sclk_en_off, cs_on, cs_off, mosi_on, mosi_off, miso_on, miso_off, mosi_data):
