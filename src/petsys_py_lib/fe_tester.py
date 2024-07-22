@@ -107,16 +107,16 @@ class Tester(object):
 		k2 = (20E3+510E3)/20E3
 
 		adc_channel_map = {
-			(0, 0) : [ (0x3, 9, k1), (0x3, 7, k2) ] + [ (0x6, n, k2) for n in range(16) ],
-			(0, 1) : [ (0x3, 8, k1), (0x3, 6, k2) ]+ [ (0x7, n, k2) for n in range(16) ],
-			(1, 0) : [ (0x3, 10, k1), (0x3, 5, k2) ]+ [ (0x8, n, k2) for n in range(16) ],
-			(1, 1) : [ (0x3, 11, k1), (0x3, 4, k2) ]+ [ (0x9, n, k2) for n in range(16) ],
+			(0, 0) : [ (0x6, n, k2) for n in range(16) ],
+			(0, 1) : [ (0x7, n, k2) for n in range(16) ],
+			(1, 0) : [ (0x8, n, k2) for n in range(16) ],
+			(1, 1) : [ (0x9, n, k2) for n in range(16) ],
 			}
 
 		adc_channels = adc_channel_map [(asic, aOrB)]
 
 		if single_read:
-			chip, channel, k = adc_channels[0]
+			chip, channel, k = adc_channels[15]
 			return self.__adc_read(chip, channel) * k
 
 		else:
