@@ -1100,7 +1100,7 @@ def check_tec(conn, testers, ddir, acquire=True):
 			results[m].append("TAC PATH HAS HIGH RESISTANCE %f" % r)
 	return results
 
-def check_aldo_fe(conn, testers, ddir, acquire=True):
+def check_aldo_unloaded(conn, testers, ddir, acquire=True):
 	results = {}
 	
 	if acquire:
@@ -1141,9 +1141,6 @@ def check_aldo_fe(conn, testers, ddir, acquire=True):
 						v_unloaded = t.get_bias_voltage(asic_id, aldo_id)
 						i_unloaded = t.get_bias_current(asic_id, aldo_id)
 						f.write("%d\t%d\t%d\t%d\t%f\t%f\t%e\t%e\n" % (m, asic_id, aldo_id, aldo_dac, v_loaded, v_unloaded, i_loaded, i_unloaded))
-						status = t.check_bias_voltage(asic_id, aldo_id, v_unloaded)
-						if status != []:
-							results[m] = "BIAS PRESENCE CHECK FAILED FOR ASIC %d ALDO %d" % (a, aldo)
 
 		conn.setAsicsConfig(asicsConfig0)
 		f.close()
@@ -1152,5 +1149,75 @@ def check_aldo_fe(conn, testers, ddir, acquire=True):
 	df = pd.read_csv("%(ddir)s/aldo_fe.tsv" % locals(), sep="\t", header=None,
 				names=["module_id", "asic_id", "aldo_id",
 					"aldo_dac", "v_loaded", "v_unloaded", "i_loaded", "i_unloaded" ])
+
+	return results
+
+def check_fe_bias_sanity(conn, testers, gain, ddir):
+	print "ALDO SANITY CHECKS"
+	results = {}
+	for m, t in testers:
+		results[m] = []
+
+	# Check which voltages we see 
+	voltages = {}
+	asicsConfig0 = conn.getAsicsConfig()
+	for aldo_dac in [0, 255]:
+		asicsConfig = deepcopy(asicsConfig0)
+		for ac in asicsConfig.values():
+			gc = ac.globalConfig
+			gc.setValue("Valdo_A_Gain", 1)
+			gc.setValue("Valdo_B_Gain", 1)
+			gc.setValue("c_aldo_range", 0b11)
+
+			gc.setValue("c_aldo_en", 0b11)
+			gc.setValue("Valdo_A_DAC", aldo_dac)
+			gc.setValue("Valdo_B_DAC", aldo_dac)
+			
+			
+		if aldo_dac == 0:
+			time.sleep(1)
+
+
+
+		conn.setAsicsConfig(asicsConfig)
+		for m, t in testers:
+			for asic_id in [0, 1]:
+				for aldo_id in [0, 1]:
+					v = t.get_bias_voltage(asic_id, aldo_id)
+					
+					if aldo_dac == 0 and v > 40:
+						results[m].append("ASIC %d ALDO %d VOLTAGE %4.1f TOO HIGH FOR DAC 0" % (asic_id, aldo_id, v))
+					if aldo_dac == 255 and v < 40:
+						results[m].append("ASIC %d ALDO %d VOLTAGE %4.1f TOO LOW FOR DAC 255" % (asic_id, aldo_id, v))
+
+					voltages[m, asic_id, aldo_id, aldo_dac] = v
+
+	for m, t in testers:
+		for asic_id in [0, 1]:
+			for aldo_id in [0, 1]:
+				for ac in asicsConfig.values():
+					gc = ac.globalConfig
+					gc.setValue("Valdo_A_Gain", 1)
+					gc.setValue("Valdo_B_Gain", 1)
+					gc.setValue("c_aldo_range", 0b11)
+
+					gc.setValue("c_aldo_en", 0b11)
+					gc.setValue("Valdo_A_DAC", 255)
+					gc.setValue("Valdo_B_DAC", 255)
+				
+				ac = asicsConfig[0, 0, 2*m+asic_id]
+				gc = ac.globalConfig
+				if aldo_id == 0:
+					gc.setValue("Valdo_A_DAC", 0)
+				else:
+					gc.setValue("Valdo_B_DAC", 0)
+
+				status = t.check_bias_voltage(asic_id, aldo_id, voltages[m, asic_id, aldo_id, 0])
+				if status != []:
+					results[m].append("ASIC %d ALDO %d CONNECTIVITY CHECK FAILED" % (asic_id, aldo))
+
+				status = t.check_bias_gnd(asic_id, aldo_id)
+				if status != True:
+					results[m].append("ASIC %d ALDO %d HVGND CONNECTIVITY CHECK FAILED" % (asic_id, aldo))
 
 	return results

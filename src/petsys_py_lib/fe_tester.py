@@ -143,6 +143,11 @@ class Tester(object):
 		return failed
 
 
+	def check_bias_gnd(self, asic, aOrB):
+		v = self.__adc_read(0x3, 12 + 2*asic + aOrB)
+		return v < 1.0
+
+
 
 	def get_bias_current(self, asic, aOrB, single_read=True):
 		adc_channel_map = {
