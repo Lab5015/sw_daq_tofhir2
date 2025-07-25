@@ -10,7 +10,8 @@ import subprocess
 import ROOT
 import sys
 import math
-from datetime import datetime 
+from datetime import datetime
+from collections import OrderedDict
 
 sys.path.append("/home/cmsdaq/Programs/Lab5015Utils/")
 #from Lab5015_utils import Keithley2450
@@ -20,10 +21,16 @@ parser = argparse.ArgumentParser(description='Acquire SiPM IV scan')
 parser.add_argument("--config", type=str, required=True, help="Configuration file")
 parser.add_argument("--bvMin", type=str, dest="bvMin", required=True, help="starting bv")
 parser.add_argument("--bvMax", type=str, dest="bvMax", required=True, help="ending bv")
+parser.add_argument("--asic", type=int, required=True, help="ASIC ID")
 parser.add_argument("--aldo", type=str, dest="aldo", required=True, help="which ALDO")
+parser.add_argument("--ch", type=str, dest="ch", required=True, help="which channel of the keithley to measure")
 parser.add_argument("--nMeas", type=str, dest="nMeas", required=False, help="number of measurements to average")
-parser.add_argument("--label", type=str, dest="label", required=False, help="folder name")
+parser.add_argument("--label", type=str, dest="label", required=True, help="label")
 parser.add_argument("--verbose", dest="verb", action="store_true", help="set to true to display output and plots, otherwise just save to root file")
+parser.add_argument("--plot", dest="plot", action="store_true", help="set to true to display plots, otherwise just save to root file")
+parser.add_argument("--fast", dest="fast", action="store_true", help="perform fast IV scan") 
+parser.add_argument("--dacStep", type=int, required=False, help="step in dac units", default=1)
+
 
 
 #------------------------
@@ -32,6 +39,12 @@ args = parser.parse_args()
 verbose = False
 if args.verb:
     verbose = True
+
+
+#---------------------------------
+# connect and configure multimeter
+mykey = KeithleyDMM6500()                                                                                                                                                                                                                                                                                                                                                 
+mykey.closeChannel(int(args.ch))
 
 
 #-----------------------------
@@ -50,50 +63,38 @@ asicsConfig = daqd.getAsicsConfig()
 activeAsics = daqd.getActiveAsics()
 
 if len(activeAsics) == 0:
-        print "no active ASICs found. Exiting..."
-        exit()
-
-
-
-#--------------------------------------------------------------------
-# enable ALDO in case needed (it's only on even ASICs, e.g. 0,2,4...)
-#if args.aldo:
-#        hvdac_config = daqd.get_hvdac_config()
-#        for portID, slaveID, railID in hvdac_config.keys():
-#                # set 48 V as ALDO input bias (should not exceed this value)
-#                hvdac_config[(portID, slaveID, railID)] = systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 48)
-#        daqd.set_hvdac_config(hvdac_config)
-
-
-#mykey = Keithley2450()
-mykey = KeithleyDMM6500()
-mykey.set_read_V()
-
-
+    print ("no active ASICs found. Exiting...")
+    exit()
+    
 asicsConfig0 = deepcopy(asicsConfig)
 cfg = deepcopy(asicsConfig0)
 
-
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
-                continue
+    if chipID%2 is not 0:
+        continue
         
-        ac = cfg[(portID, slaveID, chipID)]
-        gc = (cfg[(portID, slaveID, chipID)]).globalConfig
-        gc.setValue("c_aldo_en", 0b00)
-        daqd.setAsicsConfig(cfg)
-        sleep(0.1)
-        
-        #(_, voltage) = mykey.meas_V()
-        voltage = mykey.read()
-        print "ALDO off   I: %f uA" % (float(voltage)*1E06/10.)
+    ac = cfg[(portID, slaveID, chipID)]
+    gc = (cfg[(portID, slaveID, chipID)]).globalConfig
+    gc.setValue("c_aldo_en", 0b00)
+    daqd.setAsicsConfig(cfg)
+    sleep(5.)
+    stdout = mykey.read()
+    sleep(2)
+    
+    print( "ALDO off   I: %f uA" % (abs(stdout)*1E06/10.))
 
 
 #--------------
 # define graphs
-g_I = ROOT.TGraph()
+g_I = OrderedDict()
 g_IV = ROOT.TGraph()
 g_dlogIdV = ROOT.TGraph()
+
+
+logfolder = '../log_IV/'
+if not os.path.exists(logfolder):
+    os.mkdir(logfolder)
+    print logfolder
 
 
 #--------
@@ -101,64 +102,94 @@ g_dlogIdV = ROOT.TGraph()
 for portID, slaveID, chipID in activeAsics:
         if chipID%2 is not 0:
                 continue
+        if int(chipID) != args.asic:
+            continue
+        
+        print(portID,slaveID,chipID)
         
         ac = cfg[(portID, slaveID, chipID)]
-        for dac in range(0,256,1):
+        for dac in range(0,256,args.dacStep):
                 voltA, voltB = systemConfig.mapALDODACToVoltage((portID, slaveID, chipID),dac)
                 volt = 0.
+                
+                if args.aldo is "A":
+                    volt = float(voltA)                
+                if args.aldo is "B":
+                    volt = float(voltB)
+                if volt < float(args.bvMin):
+                    continue
+                if volt > float(args.bvMax):
+                    break
+                
+                g_I[volt] = ROOT.TGraph()
                 
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
                 if args.aldo is "A":
                     gc.setValue("c_aldo_en", 0b10)
                     gc.setValue("Valdo_A_DAC", dac)
-                    volt = float(voltA)
+
                 if args.aldo is "B":
                     gc.setValue("c_aldo_en", 0b01)
                     gc.setValue("Valdo_B_DAC", dac)
-                    volt = float(voltB)
+
                 daqd.setAsicsConfig(cfg)
-                
-                if volt < float(args.bvMin):
-                        continue
-                if volt > float(args.bvMax):
-                        break
                 
                 sleep(0.25)
                 
-                curr = 0.
+                curr  = 0.
                 vMeas = 0.
                 nMeas = 1
+                curr_list = []
+                
+                start_curr = 0.
+                start_volt = 0.
+                if (not args.fast):
+                    stdout = mykey.read()
+                    start_volt = abs(stdout)
+                    start_curr = start_volt*1E06/10./1000. #to have it in mA
+                    curr_list.append(start_curr)
+                
                 if args.nMeas:
-                        nMeas = int(args.nMeas)
+                    nMeas = int(args.nMeas)
+                #if not args.fast:
+                #    nMeas = 1 + int((start_curr/16.)*10)                    
+                #    print(start_curr,nMeas)
+                
                 it = 0
-                for _ in range(0, nMeas):
-                    sleep(1)
-                    #(_, thisVolt) = mykey.meas_V()
-                    thisVolt = mykey.read()
-                    thisVolt = abs(thisVolt)
-                    thisCurr = float(thisVolt)*1E06/10.
-                    if verbose:
-                        print ("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*thisVolt,thisCurr))
-                        #print ("dac: %3d   V_set: %6.3f V   V_meas: %f V" % (int(dac),volt,thisVolt))
-                    g_I.SetPoint(g_I.GetN(),g_I.GetN(),thisCurr)
-                    #g_IV.SetPoint(g_IV.GetN(),g_IV.GetN(),thisVolt)
-                    
-                    if it >= 0:
-                        curr = curr + thisCurr
-                        vMeas = vMeas + thisVolt
-                    it += 1
+                for _ in range(nMeas):
+                        sleep(0.25)
+                        stdout = mykey.read()
+                        this_volt = abs(stdout)
+                        this_curr = this_volt*1E06/10.
+
+                        if verbose:
+                            print ("dac: %3d   V_set: %6.3f V   V_meas: %f V -->  I: %f uA" % (int(dac),volt,this_volt,this_curr))
+                        g_I[volt].SetPoint(g_I[volt].GetN(),g_I[volt].GetN(),this_curr)
                         
-                curr = curr / nMeas
+                        if it >= 0:
+                                curr = curr + this_curr
+                                vMeas = vMeas + this_volt
+                        it += 1
+                        # last5ave = 0
+                        # print("nMeas = %f"%len(curr_list))
+                        # if (len(curr_list)>7):
+                        #     for i in range(5):
+                        #         last5ave = last5ave + curr_list[len(curr_list)-i]
+                        #         print("last5ave = %f, this_curr = %f"%(last5ave, this_curr))
+
+                        #     if (this_curr>last5ave): 
+                        #         break
+
+                        # curr_list.append(this_curr)
+                
+                curr  = curr  / nMeas
                 vMeas = vMeas / nMeas
                 g_IV.SetPoint(g_IV.GetN(),volt, curr)
-                print( "===> dac: %3.0d   V_set: %6.3f V_meas: %6.3f mV -->  I: %f uA" % (int(dac),volt,1000.*vMeas,curr))
-                #g_IV.SetPoint(g_IV.GetN(),volt, vMeas)
-                #print( "%3.0d\t%f" % (int(dac),vMeas))
+                print( "===> dac: %3d   V_set: %6.3f V_meas: %6.3f V -->  I: %f uA" % (int(dac),volt,vMeas,curr))
 
 
 #-------------------------
 # switch off bias voltages
-#systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_OFF)
 
 for portID, slaveID, chipID in activeAsics:
         if chipID%2 is not 0:
@@ -170,47 +201,36 @@ daqd.setAsicsConfig(cfg)
 
 #---------
 # plotting
-c1 = ROOT.TCanvas("c1","c1",1300,600)
-c1.Divide(2,1)
-c1.cd(1)
-g_IV.Draw("APL")
-
-c1.cd(2)
-for point in range(1, g_IV.GetN()):
-        x1 = g_IV.GetPointX(point-1)
-        y1 = g_IV.GetPointY(point-1)
-        x2 = g_IV.GetPointX(point)
-        y2 = g_IV.GetPointY(point)
+for point in range(1,g_IV.GetN()):
+    x1 = g_IV.GetPointX(point-1)
+    x2 = g_IV.GetPointX(point)
+    y1 = g_IV.GetPointY(point-1)
+    y2 = g_IV.GetPointY(point)
+    if x2 != x1:
         g_dlogIdV.SetPoint(g_dlogIdV.GetN(),0.5*(x1+x2),(math.log(y2)-math.log(y1))/(x2-x1))
-
-if verbose:
-    c1 = ROOT.TCanvas("c1","c1",500,500)
-    g_I.SetTitle("I vs i measurement;i measurement;current")
-    g_I.Draw("APL")
     
+if args.plot:
     c2 = ROOT.TCanvas("c2","c2",500,500)
     g_IV.SetTitle("I vs volt;volt [V]; I [#muA]")
     g_IV.Draw("APL")
     
     c3 = ROOT.TCanvas("c3","c3",500,500)
-    g_dlogIdV.SetTitle("dlogIdV vs volt;volt [V]; #DeltalogI/#deltaV [#muA/V]")
+    g_dlogIdV.SetTitle("dlogIdV vs volt;volt [V]; #DeltalogI/#DeltaV [#muA/V]")
     g_dlogIdV.Draw("APL")
     
     raw_input("ok?")
 
 now = datetime.now()
 this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
-if not args.label:
-    args.label = '/'
 
-os.system("mkdir -p ../log_IV/%s"%args.label)
-outfile_name = ("../log_IV/%s/IV_ALDO%s_time_%s.root"%(args.label,args.aldo,this_time))
-print('saving data to: %s' % outfile_name)
+logfile = '%s/logIV_%s_ASIC%d_ALDO%s_time_%s'%(logfolder,args.label,args.asic,args.aldo,this_time)+'.root'
+print('saving data to: %s' % logfile)
 
-outFile = ROOT.TFile(outfile_name,"RECREATE")
+outFile = ROOT.TFile(logfile,"RECREATE")
 outFile.cd()
-g_I.SetName("g_I")
-g_I.Write()
+for volt in g_I.keys():
+    g_I[volt].SetName('g_I_bv%.2f'%volt)
+    g_I[volt].Write()
 g_IV.SetName("g_IV")
 g_IV.Write()
 g_dlogIdV.SetName("g_dlogIdV")
