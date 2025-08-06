@@ -15,6 +15,8 @@ import math
 import subprocess
 from sys import stdout
 from copy import deepcopy
+import numpy as np
+import pandas as pd
 
 from . import tofhir2, tofhir2x, tofhir2b
 
@@ -22,8 +24,24 @@ MAX_PORTS = 32
 MAX_SLAVES = 32
 MAX_CHIPS = 64
 
+
+event_np_dt = np.dtype([
+	('frameID', '<u8'),
+	('channelID', '<u4'),
+	('tacID', '<u2'),
+	('t1Coarse', '<u2'),
+	('t2Coarse', '<u2'),
+	('qCoarse', '<u2'),
+	('t1Fine', '<u2'),
+	('t2Fine', '<u2'),
+	('qFine', '<u2'),
+	('extra', '<u2'),
+	('extra2', '<u4')
+])
+
+
 # Handles interaction with the system via daqd
-class Connection:
+class Connection(object):
         ## Constructor
 	def __init__(self):
 		socketPath = "/tmp/d.sock"
@@ -171,14 +189,14 @@ class Connection:
 
 	def setTestPulseBTL(self, tp_finephase, tp_fraction, tp_invert=False):
 
-                tp_finephase = int(round(tp_finephase * 6*56))   # WARNING: This should be firmware dependent..
+		tp_finephase = int(round(tp_finephase * 6*56))   # WARNING: This should be firmware dependent..
 		tp_fraction = int(0xFFFF * tp_fraction)
 
-                value = 0x1 << 62
-                value |= (tp_fraction & 0xFFFF)
-                #value |= (tgr_fraction & 0xFFFF) << 16
-                value |= (tp_finephase & 0xFFFFFF) << 31
-                if tp_invert: value |= 1 << 61
+		value = 0x1 << 62
+		value |= (tp_fraction & 0xFFFF)
+		#value |= (tgr_fraction & 0xFFFF) << 16
+		value |= (tp_finephase & 0xFFFFFF) << 31
+		if tp_invert: value |= 1 << 61
 
 		for portID, slaveID in self.getActiveFEBDs():
 			self.write_config_register(portID, slaveID, 64, 0x20B, value)
@@ -276,9 +294,16 @@ class Connection:
 			self.write_config_register(portID, slaveID, 64, 0x0214, current)
 
 
+	def set_fe_power(self, on):
+		if on:
+			value = 0b11
+		else:
+			value = 0b00
+
+		for portID, slaveID in self.getActiveFEBDs(): self.write_config_register(portID, slaveID, 2, 0x0213, value) 
+		sleep(0.1) # Wait for power to stabilize
 
 
-	## Sends the entire configuration (needs to be assigned to the abstract Connection.config data structure) to the ASIC and starts to write data to the shared memory block
         # @param maxTries The maximum number of attempts to read a valid dataframe after uploading configuration 
 	def initializeSystem(self, maxTries = 5):
 		# Stop the acquisition, if the system was still acquiring
@@ -347,8 +372,7 @@ class Connection:
 			
 			
 		# Power on ASICs
-		for portID, slaveID in self.getActiveFEBDs(): self.write_config_register(portID, slaveID, 2, 0x0213, 0b11) 
-		sleep(0.1) # Wait for power to stabilize
+		self.set_fe_power(True)
 
 		# Reset the ASICs configuration
 		for portID, slaveID in self.getActiveFEBDs(): self.write_config_register(portID, slaveID, 2, 0x0201, 0b00)
@@ -391,10 +415,10 @@ class Connection:
 			gctx.setValue("c_tx_clps", 1023)
 			
 			
-			for chipID in range(8):
+			for chipID in range(16):
 				busID = chipID / 2
 				chipID = chipID % 2
-				self.__tofhir2_cmd(portID, slaveID, busID, chipID, 33, True, False, gctx)
+				self.__tofhir2_cmd(portID, slaveID, busID, chipID, 2*busID+chipID, 33, True, False, gctx)
 		
 		
 		#
@@ -408,7 +432,7 @@ class Connection:
 		
 		
 		for portID, slaveID in self.getActiveFEBDs():
-			for chipID in range(8):
+			for chipID in range(16):
 				try:
 					# Chip may not be present, try only a few times
 					self.__doAsicCommand(portID, slaveID, chipID, "wrGlobalCfg", value=gc, maxTries=5)					
@@ -528,7 +552,8 @@ class Connection:
 				print "Retrying..."
 				return self.initializeSystem(maxTries - 1)
 			else:
-				raise ErrorAsicPresenceInconsistent(inconsistentStateAsics)
+				# If we couldn't resolve the inconsistent state let's just treat it as disabled
+				pass
 
 		self.__setSorterMode(True)
 
@@ -554,11 +579,9 @@ class Connection:
 				
 		
 		## Load bandgap e-fuses
-		self.write_config_register_febds(3, 0x0213, 0b111)
 		sleep(0.2)
 		for portID, slaveID, chipID in self.getActiveAsics():
 			self.__doAsicCommand(portID, slaveID, chipID, "efuse_load")
-		self.write_config_register_febds(3, 0x0213, 0b011)
 		sleep(0.2)
 	
 		# Adjust global bias current DAC
@@ -630,7 +653,7 @@ class Connection:
 		return self.read_mem_ctrl(portID, slaveID, ctrl_id, 16, word_width, base_address, n_words);
 		
 	def read_mem_ctrl(self, portID, slaveID, ctrl_id, addr_width, word_width, base_address, n_words):
-		n_bytes_per_addr = int(math.ceil(addr_width / 8.0))
+		n_bytes_per_addr = 2
 		n_bytes_per_word = int(math.ceil(word_width / 8.0))
 		
 		base_addr_bytes = [ (base_address >> (8*n)) & 0xFF for n in range(n_bytes_per_addr) ]
@@ -688,6 +711,39 @@ class Connection:
 		for portID, slaveID in self.getActiveFEBDs():
 			self.write_config_register(portID, slaveID, word_width, base_address, value)
 		return None
+
+	## Performs an I2C transtions
+	# @param portID  DAQ port ID where the FEB/D is connected
+	# @param slaveID Slave ID on the FEB/D chain
+	# @param busID ID of I2C bus
+	# @param s Byte sequence containing the operations
+	def i2c_master(self, portID, slaveID, busID, s):
+		# Contents of s
+		# bit 0: State to set SCL (0 pull down, 1 high-Z)
+		# bit 1: State to set SCA (0 pull down, 1 hight-Z)
+		# bit 2: Check that SCL went to the desired state
+		# bit 3: Check that SDA went to the desired state (should be 0 for read bits)
+
+		# return a sequenceof bytes with same length of 0
+		# bit 0: state of SCL
+		# bit 1: state of SDA
+		# Bits 7-4: 0x0 when OK, 0xE during a bus error
+
+		word0 = (busID >> 8) & 0xFF
+		word1 = (busID >> 0) & 0xFF
+
+		s2 = []
+		for e in s:
+			s2 += [ e, e, e, e]
+
+		command = bytearray([word0, word1] + s2)
+		r = self.sendCommand(portID, slaveID, 4, command)
+
+		status = r[0]
+		error = (status & 0xE0) != 0
+
+		return r[3::4]
+
 	
 	def spi_master_execute(self, portID, slaveID, cfgFunctionID, chipID, cycle_length, sclk_en_on, sclk_en_off, cs_on, cs_off, mosi_on, mosi_off, miso_on, miso_off, mosi_data):
 		if len(mosi_data) == 0:
@@ -908,10 +964,10 @@ class Connection:
 		return None
 
 
-	def __tofhir2_cmd(self, portID, slaveID, busID, chipID, regID, write, expect_reply, value):
-		return self.__tofhir2_cmd_ll(portID, slaveID, busID, chipID, regID, write, expect_reply, value)
+	def __tofhir2_cmd(self, portID, slaveID, busID, chipID, readID, regID, write, expect_reply, value):
+		return self.__tofhir2_cmd_ll(portID, slaveID, busID, chipID, readID, regID, write, expect_reply, value)
 
-	def __tofhir2_cmd_ll(self, portID, slaveID, busID, chipID, regID, write, expect_reply, value):
+	def __tofhir2_cmd_ll(self, portID, slaveID, busID, chipID, readID, regID, write, expect_reply, value):
 
 		l = len(value)
 		payload = bitarray(256)
@@ -923,7 +979,7 @@ class Connection:
 		
 		composed_command =  bytearray([ 
 				busID, 
-				expect_reply and 0x1 or 0x0,
+				(expect_reply and 0x80 or 0x00) | readID,
 				0x00,
 				0x2F, 0xAF, 0xC1,
 				chipID,
@@ -993,12 +1049,14 @@ class Connection:
 					raise e
 
 
-	def ___doAsicCommand(self, portID, slaveID, asicID, command, value=None, channel=None):
+	def ___doAsicCommand(self, portID, slaveID, asicID, command, value=None, channel=None, readID=None):
 		busID = asicID / 2
 		lChipID = asicID % 2
+		if not readID: readID = 2*busID + lChipID
+
 		
 		if command == "wrGlobalCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 32, True, True, value)
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 32, True, True, value)
 			# Check write with readback
 			readStatus, readValue = self.__doAsicCommand(portID, slaveID, asicID, "rdGlobalCfg")
 			if readValue !=  value:
@@ -1007,11 +1065,11 @@ class Connection:
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 
 		elif command == "rdGlobalCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 32, False, True, self.__asic_module.AsicGlobalConfig())
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 32, False, True, self.__asic_module.AsicGlobalConfig())
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 
 		elif command == "wrChCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, channel, True, True, value)
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, channel, True, True, value)
 			# Check write with readback
 			readStatus, readValue = self.__doAsicCommand(portID, slaveID, asicID, "rdChCfg", channel=channel)
 			if readValue !=  value:
@@ -1020,16 +1078,16 @@ class Connection:
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 
 		elif command == "rdChCfg":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, channel, False, True, self.__asic_module.AsicChannelConfig())
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, channel, False, True, self.__asic_module.AsicChannelConfig())
 			return status, self.__asic_module.AsicGlobalConfig(reply)
 		
 		elif command == "rdStatus":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 34, False, True, self.__asic_module.AsicGlobalConfigStatus())
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 34, False, True, self.__asic_module.AsicGlobalConfigStatus())
 			return status, self.__asic_module.AsicGlobalConfigStatus(reply)
 		
 		elif command == "efuse_load":
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 35, True, False, bitarray(254))
-			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, 36, True, False, bitarray(254))
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 35, True, False, bitarray(254))
+			status, reply = self.__tofhir2_cmd(portID, slaveID, busID, lChipID, readID, 36, True, False, bitarray(254))
 			return status, []
 		
 		
@@ -1167,16 +1225,17 @@ class Connection:
 		else:
 			modeFile = open("/dev/null", "w")
 
-                modeFile.write("#portID\tslaveID\tchipID\tchannelID\tmode\n")
+                modeFile.write("#portID\tslaveID\tchipID\tchannelID\tmode\tattGain\n")
                 modeList = [] 
                 for portID, slaveID, chipID in asicsConfig.keys():
                         ac = asicsConfig[(portID, slaveID, chipID)]
                         for channelID in range(len(ac.channelConfig)):
                                 cc = ac.channelConfig[channelID]
                                 #mode = cc.getValue("qdc_mode") and "qdc" or "tot"
+                                att = cc.getValue("cfg_a2_attenuator_gain")
                                 mode = "qdc"
                                 modeList.append(mode)
-                                modeFile.write("%d\t%d\t%d\t%d\t%s\n" % (portID, slaveID, chipID, channelID, mode))
+                                modeFile.write("%d\t%d\t%d\t%d\t%s\t%d\n" % (portID, slaveID, chipID, channelID, mode, att))
                                 
                 if(len(set(modeList))!=1):
                         qdcMode = "mixed"
@@ -1303,7 +1362,7 @@ class Connection:
 
         ## Acquires data and decodes it into a bytes buffer
         # @param acquisitionTime Acquisition time in seconds
-	def acquireAsBytes(self, acquisitionTime):
+	def acquireAsBytes(self, acquisitionTime, skipcheckAsicRx=False):
 		frameLength = 1024.0 / self.__systemFrequency
 		nRequiredFrames = int(acquisitionTime / frameLength)
 
@@ -1365,18 +1424,15 @@ class Connection:
 
 			nFrames = currentFrame - startFrame + 1
 			nBlocks += 1
-			if (currentFrame - lastUpdateFrame) * frameLength > 0.1:
-				t1 = time()
-				stdout.write("Python:: Acquired %d frames in %4.1f seconds, corresponding to %4.1f seconds of data (delay = %4.1f)\r" % (nFrames, t1-t0, nFrames * frameLength, (t1-t0) - nFrames * frameLength))
-				stdout.flush()
-				lastUpdateFrame = currentFrame
-		t1 = time()
-		print "Python:: Acquired %d frames in %4.1f seconds, corresponding to %4.1f seconds of data (delay = %4.1f)" % (nFrames, time()-t0, nFrames * frameLength, (t1-t0) - nFrames * frameLength)
 
-		# Check ASIC link status at end of acquisition
-		self.checkAsicRx()
+		if not skipcheckAsicRx:
+			# Check ASIC link status at end of acquisition
+			self.checkAsicRx()
 
 		return data
+
+	def acquireAsPandas(self, acquisitionTime, skipcheckAsicRx=False):
+		return pd.DataFrame(np.frombuffer(self.acquireAsBytes(acquisitionTime, skipcheckAsicRx), event_np_dt))
 
 	
 	def checkAsicRx(self):

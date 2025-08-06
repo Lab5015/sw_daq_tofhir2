@@ -95,6 +95,7 @@ configure_file("src/petsys_util/bga_test_reprocess" "bga_test_reprocess" COPYONL
 configure_file("src/petsys_util/fe_test" "fe_test" COPYONLY)
 configure_file("src/petsys_util/fe_test_reprocess" "fe_test_reprocess" COPYONLY)
 configure_file("src/petsys_util/acquire_exttp_calibration" "acquire_exttp_calibration" COPYONLY)
+configure_file("src/petsys_util/daqd.sh" "daqd.sh" COPYONLY)
 
 
 include_directories( ${ROOT_INCDIR} )
