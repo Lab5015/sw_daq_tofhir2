@@ -48,12 +48,12 @@ SystemConfig *SystemConfig::fromFile(const char *configFileName, uint64_t mask, 
 
 	config->hasTDCCalibration = false;
 	if((mask & LOAD_TDC_CALIBRATION) != 0) {
-		char *entry = iniparser_getstring(configFile, "main:tdc_calibration_table", NULL);
+		const char *entry = iniparser_getstring(configFile, "main:tdc_calibration_table", NULL);
 		if(entry == NULL) {
 			fprintf(stderr, "ERROR: tdc_calibration_table not specified in section 'main' of '%s'\n", configFileName);
 			exit(1);
 		}
-		replace_variables(fn, entry, cdir);
+		replace_variables(fn, (char*)entry, cdir);
 		loadTDCCalibration(config, fn);
 		config->hasTDCCalibration = true;
 	}
@@ -61,19 +61,19 @@ SystemConfig *SystemConfig::fromFile(const char *configFileName, uint64_t mask, 
 	config->hasQDCCalibration = false;
 	config->hasEnergyCalibration = false;
 	if ((mask & LOAD_QDC_CALIBRATION) != 0) {
-		char *entry = iniparser_getstring(configFile, "main:qdc_calibration_table", NULL);
+		const char *entry = iniparser_getstring(configFile, "main:qdc_calibration_table", NULL);
 		if(entry == NULL) {
 			fprintf(stderr, "ERROR: qdc_calibration_table not specified in section 'main' of '%s'\n", configFileName);
 			exit(1);
 		}
-		replace_variables(fn, entry, cdir);
+		replace_variables(fn, (char*)entry, cdir);
 		sprintf(fn2,fn,att);
 		loadQDCCalibration(config, fn2);
 		config->hasQDCCalibration = true;
 
 		entry = iniparser_getstring(configFile, "main:energy_calibration_table", NULL);
 		if(entry != NULL) {
-			replace_variables(fn, entry, cdir);
+		  replace_variables(fn, (char*)entry, cdir);
 			loadEnergyCalibration(config, fn);
 			config->hasEnergyCalibration = true;
 		}	
@@ -83,12 +83,12 @@ SystemConfig *SystemConfig::fromFile(const char *configFileName, uint64_t mask, 
 
 	config->hasXYZ = false;
 	if((mask & LOAD_MAPPING) != 0) {
-		char *entry = iniparser_getstring(configFile, "main:channel_map", NULL);
+		const char *entry = iniparser_getstring(configFile, "main:channel_map", NULL);
 		if(entry == NULL) {
 			fprintf(stderr, "ERROR: channel_map not specified in section 'main' of '%s'\n", configFileName);
 			exit(1);
 		}
-		replace_variables(fn, entry, cdir);
+		replace_variables(fn, (char*)entry, cdir);
 		loadChannelMap(config, fn);
 		config->hasXYZ = true;
 		
@@ -97,7 +97,7 @@ SystemConfig *SystemConfig::fromFile(const char *configFileName, uint64_t mask, 
 			fprintf(stderr, "ERROR: trigger_map not specified in section 'main' of '%s'\n", configFileName);
 			exit(1);
 		}
-		replace_variables(fn, entry, cdir);
+		replace_variables(fn, (char*)entry, cdir);
 		loadTriggerMap(config, fn);
 	}
 	
