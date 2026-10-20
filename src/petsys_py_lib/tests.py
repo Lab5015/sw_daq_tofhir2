@@ -873,7 +873,7 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 			for ch in range(32):
 				for amp in range(1,32,4):
 					for m,a,t in sockets:
-						t.injector_enable(ch, 0x8000 + amp * 0x8000/32)
+						t.injector_enable(ch, 0x8000 + amp * 0x8000//32)
 
 					
 					asicsConfig = deepcopy(asicsConfig0)

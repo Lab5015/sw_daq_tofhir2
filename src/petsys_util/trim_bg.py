@@ -10,12 +10,12 @@ import serial
 
 def read_multimeter(port):
 	sleep(0.5)
-	port.write(':MEAS:VOLT:DC? \r')
+	port.write(b':MEAS:VOLT:DC? \r')
 	port.flush(); sleep(0.1)
 	reply = port.read(16)
 
 	sleep(0.5)
-	port.write(':MEAS:VOLT:DC? \r')
+	port.write(b':MEAS:VOLT:DC? \r')
 	port.flush(); sleep(0.1)
 	reply = port.read(16)
 	reply = reply[:-1]
@@ -39,7 +39,7 @@ def main(argv):
 	portID = 0
 	slaveID = 0
 	chipID = int(argv[1])	# 0 is A0, 1 is A1, ...
-	busID = chipID / 2
+	busID = chipID // 2
 	chipID = chipID % 2
 	output_file = open(argv[2], "w")
 	

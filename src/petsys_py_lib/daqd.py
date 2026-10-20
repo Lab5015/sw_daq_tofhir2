@@ -4,7 +4,7 @@
 # Handles interaction with the system via daqd
 
 import sys
-import shm_raw
+from . import shm_raw
 import socket
 from random import randrange
 import struct
@@ -23,6 +23,10 @@ from . import tofhir2, tofhir2x, tofhir2b
 MAX_PORTS = 32
 MAX_SLAVES = 32
 MAX_CHIPS = 64
+
+# Python 2 round(): halves are rounded away from zero (Python 3 rounds them to even)
+def round_half_away(x):
+	return int(math.copysign(math.floor(abs(x) + 0.5), x))
 
 
 event_np_dt = np.dtype([
@@ -84,7 +88,7 @@ class Connection(object):
 		n = struct.calcsize(template)
 		data = self.__socket.recv(n);
 		length, s0, p1, s1 = struct.unpack(template, data)
-		name = self.__socket.recv(length - n);
+		name = self.__socket.recv(length - n).decode('ascii');
 		return (name, s0, p1, s1)
 
 	## Returns the system reference clock frequency
@@ -189,7 +193,7 @@ class Connection(object):
 
 	def setTestPulseBTL(self, tp_finephase, tp_fraction, tp_invert=False):
 
-		tp_finephase = int(round(tp_finephase * 6*56))   # WARNING: This should be firmware dependent..
+		tp_finephase = round_half_away(tp_finephase * 6*56)   # WARNING: This should be firmware dependent..
 		tp_fraction = int(0xFFFF * tp_fraction)
 
 		value = 0x1 << 62
@@ -226,10 +230,10 @@ class Connection(object):
 			if interval % tacRefreshPeriod == 0:
 				print("WARNING: Test pulse period %d is a multiple of TAC refresh period %d (%d %d) in some ASICs." % (interval, tacRefreshPeriod, tacRefreshPeriod_1, tacRefreshPeriod_2))
 		
-		finePhase = int(round(finePhase * 6*56))	# WARNING: This should be firmware dependent..
+		finePhase = round_half_away(finePhase * 6*56)	# WARNING: This should be firmware dependent..
 	
 		if interval < (length + 1):
-			raise "Interval (%d) must be greater than length (%d) + 1" % (interval, length)
+			raise ValueError("Interval (%d) must be greater than length (%d) + 1" % (interval, length))
 
 		interval = interval - (length + 1)
 
@@ -416,7 +420,7 @@ class Connection(object):
 			
 			
 			for chipID in range(16):
-				busID = chipID / 2
+				busID = chipID // 2
 				chipID = chipID % 2
 				self.__tofhir2_cmd(portID, slaveID, busID, chipID, 2*busID+chipID, 33, True, False, gctx)
 		
@@ -518,8 +522,8 @@ class Connection(object):
 		for gID in range(MAX_PORTS * MAX_SLAVES * MAX_CHIPS):
 			statusTripplet = (asicConfigOK[gID], deserializerStatus[gID], decoderStatus[gID])
 			chipID = gID % MAX_CHIPS
-			slaveID = (gID / MAX_CHIPS) % MAX_SLAVES
-			portID = gID / (MAX_CHIPS * MAX_SLAVES)
+			slaveID = (gID // MAX_CHIPS) % MAX_SLAVES
+			portID = gID // (MAX_CHIPS * MAX_SLAVES)
 
 			if statusTripplet == (True, True, True):
 				# All OK, ASIC is present and OK
@@ -764,7 +768,7 @@ class Connection(object):
 		return self.sendCommand(portID, slaveID, cfgFunctionID, bytearray(command))
 			
 	def __write_hv_ad5535(self, portID, slaveID, channelID, value):
-		chipID = channelID / 32
+		chipID = channelID // 32
 		channelID = channelID % 32
 		#chipID = 1 - whichDAC # Wrong decoding in ad5535.vhd
 		
@@ -870,17 +874,15 @@ class Connection(object):
 		
 	def read_hv_m95256(self, portID, slaveID, address, n_bytes):
 		# Break down reads into 4 byte chunks due to DAQ
-		rr = ''
+		rr = bytearray()
 		for a in range(address, address + n_bytes, 4):
 			count = min([4, address + n_bytes - a])
 			r = self.__m95256_ll(portID, slaveID, 3, 0, [0b00000011, (a >> 8) & 0xFF, a & 0xFF], count)
-			r = r[1:-1]
-			r = ('').join([chr(x) for x in r ])
-			rr += r
-		return rr
+			rr += r[1:-1]
+		return bytes(rr)
 	
 	def write_hv_m95256(self, portID, slaveID, address, data):
-		data = [ ord(x) for x in data ]
+		data = list(bytearray(data))
 		while True:
 			# Check if Write In Progress is set and if so, sleep and try again
 			r = self.__m95256_ll(portID, slaveID, 3, 0, [0b00000101], 1)
@@ -926,7 +928,7 @@ class Connection(object):
 			self.__lastSN = (sn + 1) & 0x7FFF
 
 			rawFrame = bytearray([ portID & 0xFF, slaveID & 0xFF] + [ (sn >> (8*n)) & 0xFF for n in range(16) ] + [ cfgFunctionID]) + payload
-			rawFrame = str(rawFrame)
+			rawFrame = bytes(rawFrame)
 
 			#print [ hex(ord(x)) for x in rawFrame ]
 
@@ -1022,7 +1024,7 @@ class Connection(object):
 			
 
 		tmp = bitarray()
-		tmp.frombytes(str(reply))
+		tmp.frombytes(bytes(reply))
 		#print tmp
 		reply = tmp[-l:]
 		#print "DEBUG VI", len(value), value
@@ -1050,7 +1052,7 @@ class Connection(object):
 
 
 	def ___doAsicCommand(self, portID, slaveID, asicID, command, value=None, channel=None, readID=None):
-		busID = asicID / 2
+		busID = asicID // 2
 		lChipID = asicID % 2
 		if not readID: readID = 2*busID + lChipID
 
@@ -1263,7 +1265,7 @@ class Connection(object):
 			str(qdcMode), "%1.12f" % self.getAcquisitionStartTime(),
 			calMode and 'T' or 'N', 
 			str(triggerID) ]
-		self.__helperPipe = subprocess.Popen(cmd, bufsize=1, stdin=subprocess.PIPE, stdout=subprocess.PIPE, close_fds=True)
+		self.__helperPipe = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, close_fds=True)
 
 
 	## Closes the current acquisition file
@@ -1322,8 +1324,8 @@ class Connection(object):
 			# Because the entire frame block won't be freed until writeRaw is done, we can end up in a situation
 			# where writeRaw owns all frames and daqd has no buffer space, even if writeRaw has already processed 
 			# some/most of the frame block
-			if nFramesInBlock > bs/2:
-				nFramesInBlock = bs/2
+			if nFramesInBlock > bs//2:
+				nFramesInBlock = bs//2
 
 			wrPointer = (rdPointer + nFramesInBlock) % (2*bs)
 
@@ -1402,8 +1404,8 @@ class Connection(object):
 			# Because the entire frame block won't be freed until writeRaw is done, we can end up in a situation
 			# where writeRaw owns all frames and daqd has no buffer space, even if writeRaw has already processed
 			# some/most of the frame block
-			if nFramesInBlock > bs/2:
-				nFramesInBlock = bs/2
+			if nFramesInBlock > bs//2:
+				nFramesInBlock = bs//2
 
 			wrPointer = (rdPointer + nFramesInBlock) % (2*bs)
 
@@ -1528,7 +1530,7 @@ class Connection(object):
 
 	def __synchronizeDataToConfig(self, clearFrames=True):
 
-		targetFrameID = self.getCurrentTimeTag() / 1024
+		targetFrameID = self.getCurrentTimeTag() // 1024
 
 		template1 = "@HH"
 		template2 = "@Q"
@@ -1556,7 +1558,7 @@ class Connection(object):
 		self.checkAsicRx()
 
 		while True:	
-			targetFrameID = self.getCurrentTimeTag() / 1024
+			targetFrameID = self.getCurrentTimeTag() // 1024
 			#print "Waiting for frame %1d" % targetFrameID
 			while True:
 				df = self.__getDecodedDataFrame()
@@ -1573,7 +1575,7 @@ class Connection(object):
 				self.__setDataFrameReadPointer(wrPointer);
 
 			# Do this until we took less than 100 ms to sync
-			currentFrameID = self.getCurrentTimeTag() / 1024
+			currentFrameID = self.getCurrentTimeTag() // 1024
 			if (currentFrameID - targetFrameID) * frameLength < 0.100:
 				break
 
@@ -1702,7 +1704,7 @@ class Connection(object):
 			if len(dout) < (3 + nSensors):
 				raise TMP104CommunicationError(portID, slaveID, din, dout)
 
-			temperatures = dout[3:]
+			temperatures = list(dout[3:])
 			for i, t in enumerate(temperatures):
 				if t > 127: t = t - 256
 				temperatures[i] = t
@@ -1759,7 +1761,7 @@ class ErrorInvalidAsicType(Exception):
 	def __init__(self, portID, slaveID, value):
 		self.addr = portID, slaveID, value
 	def __str__(self):
-		return "Invalid ASIC type FEB/D at port %2d, slave %2d: %016llx" % self.addr
+		return "Invalid ASIC type FEB/D at port %2d, slave %2d: %016x" % self.addr
 ## Exception: no active FEB/D was found in any port.
 #  Indicates that no FEB/D is plugged and powered on or that it's not being able to establish a data link.
 class ErrorNoFEB(Exception):

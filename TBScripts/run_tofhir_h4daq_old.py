@@ -83,12 +83,12 @@ if __name__ == "__main__":
     sockets["GUI"] = context.socket(zmq.SUB)
     print("Connecting GUI at %s"%daqConfig["GUI_port"])
     sockets["GUI"].connect(daqConfig["GUI_port"])
-    sockets["GUI"].setsockopt(zmq.SUBSCRIBE, '')
+    sockets["GUI"].setsockopt_string(zmq.SUBSCRIBE, '')
     poller.register(sockets["GUI"], zmq.POLLIN)
     sockets["RC"] = context.socket(zmq.SUB)
     print("Connecting RC at %s"%daqConfig["RC_port"])
     sockets["RC"].connect(daqConfig["RC_port"])
-    sockets["RC"].setsockopt(zmq.SUBSCRIBE, '')
+    sockets["RC"].setsockopt_string(zmq.SUBSCRIBE, '')
     poller.register(sockets["RC"], zmq.POLLIN)
     #---Public status_port
     status_port = context.socket(zmq.PUB)
@@ -109,18 +109,18 @@ if __name__ == "__main__":
         while True:
             ###---Post INITIALIZED status every 0.1sec (ready for start run)
             time.sleep(0.1)
-            status_port.send("STATUS statuscode=%s runnumber=0 spillnumber=0 evinspill=0 paused=0" % H4DAQStatuses["INITIALIZED"])
+            status_port.send_string("STATUS statuscode=%s runnumber=0 spillnumber=0 evinspill=0 paused=0" % H4DAQStatuses["INITIALIZED"])
 
             ###---check for GUI commands
             ###   do not wait since we need to continue publish data
             try:
-                message = sockets["GUI"].recv(zmq.DONTWAIT)            
+                message = sockets["GUI"].recv_string(zmq.DONTWAIT)            
 
                 ###---Handle GUI_DIE (after pressing "Quit DAQ" button in GUI)
                 ###   kill daqd instance and exit 
                 if "GUI_DIE" in message:
                     sys.stderr.write(message+'\n')
-                    status_port.send("STATUS statuscode=%s runnumber=0 spillnumber=0 evinspill=0 paused=0" % H4DAQStatuses["BYE"])
+                    status_port.send_string("STATUS statuscode=%s runnumber=0 spillnumber=0 evinspill=0 paused=0" % H4DAQStatuses["BYE"])
                     my_tofhir.stopRun()
                     #                commands.getoutput("sudo systemctl stop daqd.service")
                     sys.exit(0)
@@ -175,11 +175,11 @@ if __name__ == "__main__":
                 timeCounter = timeCounter+1
                 if timeCounter == 200:
                     timeCounter = 0
-                    status_port.send("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
+                    status_port.send_string("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
                                      % (H4DAQStatuses["CLEARED"], runNumber, str(spillNumber)))
 
                 try:
-                    message = sockets["RC"].recv(zmq.DONTWAIT)
+                    message = sockets["RC"].recv_string(zmq.DONTWAIT)
                     sys.stderr.write("Spill loop message: %s\n" % message)
                     if message == "WE\0":
                         sys.stderr.write("Begin spill\n")
@@ -200,10 +200,10 @@ if __name__ == "__main__":
                         time.sleep(0.15) #---wait for DAQ to be effectively started...
                         
                         #---Inform RC that TOFPET is ready to acquire
-                        cmd_port.send("DR_READY\0") 
+                        cmd_port.send_string("DR_READY\0") 
 
                         #---Post READ during acquire
-                        status_port.send("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
+                        status_port.send_string("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
                                          % (H4DAQStatuses["READ"], runNumber, str(spillNumber)))
 
 #                        my_tofhir.getData(tofhirConfig['spillDuration'])
@@ -218,19 +218,19 @@ if __name__ == "__main__":
                             sequenceCounter=(sequenceCounter+1)%len(sequence)
 
                         try:
-                            post_acq_message = sockets["RC"].recv(zmq.DONTWAIT)
+                            post_acq_message = sockets["RC"].recv_string(zmq.DONTWAIT)
                             if post_acq_message == "EE\0":
                                 sys.stderr.write("End spill\n")
-                                status_port.send("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
+                                status_port.send_string("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
                                           % (H4DAQStatuses["ENDSPILL"], runNumber, str(spillNumber)))
                                 ###---FIXME -> dump raw data to root file
                             else:
                                 sys.stderr.write("ERROR: EE expected from RC got %s\n" % post_acq_message)
-                                status_port.send("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
+                                status_port.send_string("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
                                                  % (H4DAQStatuses["ERROR"], runNumber, str(spillNumber)))
                         except zmq.Again:
                             sys.stderr.write("ERROR: EE expected from RC got nothing\n")
-                            status_port.send("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
+                            status_port.send_string("STATUS statuscode=%s runnumber=%s spillnumber=%s evinspill=0 paused=0" 
                                              % (H4DAQStatuses["ERROR"], runNumber, str(spillNumber)))
                             continue
                     

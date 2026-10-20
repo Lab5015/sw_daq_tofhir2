@@ -162,7 +162,7 @@ else:
 
 if args.trigger == "ext":
         for portID, slaveID, chipID in activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                         continue
                 gc = asicsConfig[(portID, slaveID, chipID)].globalConfig
                 # Enable L1 trigger for even ASICs (with flex and ALDO)
@@ -268,7 +268,7 @@ for ith1 in ith1_list:
                                 
                                 if args.aldo:
                                         for portID, slaveID, chipID in activeAsics:
-                                                if chipID%2 is not 0:
+                                                if chipID%2 != 0:
                                                         continue
                                                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
                                                 gc.setValue("c_aldo_en", 0b11)
@@ -301,7 +301,7 @@ systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_OFF)
 
 if args.aldo:
         for portID, slaveID, chipID in activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                         continue
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b00)

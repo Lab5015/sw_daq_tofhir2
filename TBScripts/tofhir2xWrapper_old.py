@@ -67,7 +67,7 @@ class tofhir:
 
         if self.trigger == "ext":
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = self.asicsConfig[(portID, slaveID, chipID)].globalConfig
                 # Enable L1 trigger for even ASICs (with flex and ALDO)
@@ -131,7 +131,7 @@ class tofhir:
                                 
         if self.aldo:
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 bd, over__ = self.systemConfig.getBiasChannelDefaultSettingsAldo((portID, slaveID, chipID))
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
@@ -148,7 +148,7 @@ class tofhir:
         if self.aldo:
             cfg = deepcopy(self.asicsConfig)
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b11)
@@ -174,7 +174,7 @@ class tofhir:
         if self.aldo:
             cfg = deepcopy(self.asicsConfig)
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b00)

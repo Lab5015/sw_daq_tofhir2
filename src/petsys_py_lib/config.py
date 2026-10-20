@@ -3,7 +3,6 @@ import configparser
 import os.path
 import re
 from sys import stderr
-from string import upper
 from . import tofhir2
 import bitarray
 import math
@@ -22,6 +21,10 @@ LOAD_ALL		= 0xFFFFFFFF
 APPLY_BIAS_OFF		= 0x0
 APPLY_BIAS_PREBD	= 0x1
 APPLY_BIAS_ON		= 0x2
+
+# Python 2 round(): halves are rounded away from zero (Python 3 rounds them to even)
+def round_half_away(x):
+	return int(math.copysign(math.floor(abs(x) + 0.5), x))
 
 def replace_variables(entry, cdir):
 	tmp = entry
@@ -240,7 +243,7 @@ class Config:
 						if (r1,r2) in hw_trigger_regions or (r2,r1) in hw_trigger_regions:
 							region_mask[r2] = 1
 
-					region_data = [ ord(u) for u in region_mask.tobytes() ]
+					region_data = list(region_mask.tobytes())
 					daqd.write_mem_ctrl(portID, slaveID, 6, 8, r1 * bytes_per_region, region_data)
 				
 				# FEB/D setup
@@ -276,7 +279,7 @@ class Config:
 		m = (y2 - y1)/(x2 - x1)
 		b = y1 - m*x1
 		x = (y-b)/m
-		return int(round(x))
+		return round_half_away(x)
 		
 	def getCalibratedDiscChannels(self):
 		return list(self.__asicChannelBaselineSettingsTable.keys())
@@ -298,14 +301,14 @@ class Config:
 			return int( tmp[vth_str]*(def_range[vth_str]+1)/(disc_range+1) + value)
 		return int( tmp[vth_str] + value)
                 
-	def mapALDOVoltageToDAC(self, xxx_todo_changeme, bd, ov):
-		(portID, slaveID, chipID, aldoID) = xxx_todo_changeme
+	def mapALDOVoltageToDAC(self, key, bd, ov):
+		(portID, slaveID, chipID, aldoID) = key
 		ret = -1
 		best = 9999.
 		table = {}
-		if aldoID is 'A':
+		if aldoID == 'A':
 			table = self.__ALDOACalibrationTable[(portID, slaveID, chipID)]
-		if aldoID is 'B':
+		if aldoID == 'B':
 			table = self.__ALDOBCalibrationTable[(portID, slaveID, chipID)]
                 
 		for key in table:
@@ -316,8 +319,8 @@ class Config:
 		print(("ALDO %s on ASIC%d:   DAC: %d   V: %f") %(aldoID,chipID,int(ret),float(table[ret])))
 		return ret
 
-	def mapALDODACToVoltage(self, xxx_todo_changeme1, dac):
-		(portID, slaveID, chipID) = xxx_todo_changeme1
+	def mapALDODACToVoltage(self, key, dac):
+		(portID, slaveID, chipID) = key
 		retA = float(self.__ALDOACalibrationTable[(portID, slaveID, chipID)][dac])
 		retB = float(self.__ALDOBCalibrationTable[(portID, slaveID, chipID)][dac])
 		return retA, retB
@@ -350,10 +353,10 @@ def parseAsicParameters(configParser):
 
 
 def normalizeAndSplit(l):
-	l = re.sub("\s*#.*", "", l)	# Remove comments
-	l = re.sub('^\s*', '', l)	# Remove leading white space
-	l = re.sub('\s*$', '', l)	# Remove trailing whitespace
-	l = re.sub('\s+', '\t', l)	# Normalize whitespace to tabs
+	l = re.sub(r"\s*#.*", "", l)	# Remove comments
+	l = re.sub(r'^\s*', '', l)	# Remove leading white space
+	l = re.sub(r'\s*$', '', l)	# Remove trailing whitespace
+	l = re.sub(r'\s+', '\t', l)	# Normalize whitespace to tabs
 	l = re.sub('\r', '', l)		# Remove \r
 	l = re.sub('\n', '', l)		# Remove \l
 	l = l.split('\t')
@@ -496,7 +499,7 @@ def readTriggerMap(fn):
 		if l == ['']: continue
 		r1 = int(l[0])
 		r2 = int(l[1])
-		c = upper(l[2])
+		c = l[2].upper()
 		if c not in ['M', 'C']:
 			print("Error in '%s' line %d: type must be 'M' or 'C'\n" % (fn, ln))
 			exit(1)

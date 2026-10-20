@@ -79,7 +79,7 @@ class tofhir:
 
         if self.trigger == "ext":
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = self.asicsConfig[(portID, slaveID, chipID)].globalConfig
                 # Enable L1 trigger for even ASICs (with flex and ALDO)
@@ -107,7 +107,7 @@ class tofhir:
         self.attGain=attGain
 
         for portID, slaveID, chipID in self.activeAsics:
-            if int(chipID) is 3:
+            if int(chipID) == 3:
                 continue
             
             ac = self.asicsConfig[(portID, slaveID, chipID)]
@@ -239,7 +239,7 @@ class tofhir:
                                 
         if self.aldo:
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = (self.asicsConfig[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b11)
@@ -271,7 +271,7 @@ class tofhir:
         print("HV ON")
         if self.aldo:
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = (self.asicsConfig[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b11)
@@ -298,7 +298,7 @@ class tofhir:
         #Turn HV OFF
         if self.aldo:
             for portID, slaveID, chipID in self.activeAsics:
-                if chipID%2 is not 0:
+                if chipID%2 != 0:
                     continue
                 gc = (self.asicsConfig[(portID, slaveID, chipID)]).globalConfig
                 gc.setValue("c_aldo_en", 0b00)

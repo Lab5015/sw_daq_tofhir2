@@ -38,7 +38,12 @@ def compile_cfg_map(*args):
 
 ## Contains parameters and methods related to the global operation of one ASIC. 
 class AbstractConfig(bitarray):
-	## Constructor. 
+	# bitarray >= 1.0 no longer accepts the "initial" keyword in __new__;
+	# subclasses fill in their contents in __init__
+	def __new__(cls, initial=None, endian="big"):
+		return bitarray.__new__(cls, endian=endian)
+
+	## Constructor.
 	# Defines and sets all fields to default values. Most important fields are:
 	# 
 	def __init__(self,  endian="big"):

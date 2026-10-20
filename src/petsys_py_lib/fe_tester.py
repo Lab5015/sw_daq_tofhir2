@@ -23,7 +23,7 @@ class Tester(object):
 
 			iin = self.get_uut_iin()
 			if iin > 1.2:
-				print("WARNING: Tester (%d, %d) UUT input current is above 1.2A and will be disabled" % (self.__p, self.__s, self.__m, iin))
+				print("WARNING: Tester (%d, %d, %d) UUT input current (%.3f A) is above 1.2A and will be disabled" % (self.__p, self.__s, self.__m, iin))
 				self.set_uut_power(False)
 				
 	

@@ -79,7 +79,7 @@ asicsConfig0 = deepcopy(asicsConfig)
 cfg = deepcopy(asicsConfig0)
 
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
+        if chipID%2 != 0:
                 continue
         if chipID != args.asic: continue 
         ac = cfg[(portID, slaveID, chipID)]
@@ -105,7 +105,7 @@ g_I = ROOT.TGraph()
 #--------
 # ov scan
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
+        if chipID%2 != 0:
                 continue
 
         if chipID != args.asic: continue
@@ -146,7 +146,7 @@ for portID, slaveID, chipID in activeAsics:
             timestamp_curr = datetime.now()
             sleep(0.2)
             if args.laser:
-                if float((timestamp_curr - timestamp_init).total_seconds()) > args.time/4. and lasState is 0:
+                if float((timestamp_curr - timestamp_init).total_seconds()) > args.time/4. and lasState == 0:
                     las.set_trigger(0)
                     las.set_freq(50000)
                     #las.set_freq(467000)
@@ -163,7 +163,7 @@ for portID, slaveID, chipID in activeAsics:
 systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_OFF)
 
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
+        if chipID%2 != 0:
                 continue
         gc = (cfg[(portID, slaveID, chipID)]).globalConfig
         gc.setValue("c_aldo_en", 0b00)

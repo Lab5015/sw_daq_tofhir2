@@ -53,7 +53,7 @@ hPad1.Draw()
 
 for it in range(0, 2, 1):
     graph = graphs[it]
-    graph.SetLineStyle(1+it/2)
+    graph.SetLineStyle(1+it//2)
     graph.SetLineColor(1+it%2)
     graph.SetMarkerColor(1+it%2)
     graph.Draw("PL,same")

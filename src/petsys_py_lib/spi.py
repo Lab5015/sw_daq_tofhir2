@@ -1,6 +1,6 @@
 import time
 
-def tmp126_ll(conn, portID, slaveID, chipID, data):
+def tmp126_ll(conn, portID, slaveID, chipID, data_out):
 	p = 2
 	padding = [ 0xFF for n in range(p) ]
 	p = 8 * p

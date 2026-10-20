@@ -207,6 +207,10 @@ class GUI:
     def write_to_textview(self, fd, condition):
         if condition == GLib.IO_IN: 
             char = fd.read() 
+            if char is None:
+                # Non-blocking read with no data available
+                return True
+            char = char.decode("utf-8", errors="replace")
             tview = self.builder.get_object("executeTextView")
             buf = self.builder.get_object("executeTextView").get_buffer()
         
@@ -231,6 +235,10 @@ class GUI:
     def write_to_textview_temp(self, fd, condition):
         if condition == GLib.IO_IN: 
             char = fd.read() 
+            if char is None:
+                # Non-blocking read with no data available
+                return True
+            char = char.decode("utf-8", errors="replace")
             tview = self.builder.get_object("readTempTextView")
             buf = self.builder.get_object("readTempTextView").get_buffer()
         
@@ -337,7 +345,7 @@ class GUI:
             # Check if there are other instances of daqd
             if not self.__daqd_switch_handle_set:
                 if self.is_daqd_running():
-                    daqdPids = subprocess.check_output(["pidof", "daqd"])
+                    daqdPids = subprocess.check_output(["pidof", "daqd"], universal_newlines=True)
                     pidsToKill = daqdPids.split(" ")
 
                     if self.show_confirmation_dialog("There are other instances of daqd running in the system. Kill them and open a new instance?"):
@@ -360,7 +368,7 @@ class GUI:
 
                 # Check if daqd opened successfully and store pids of processes
                 if self.is_daqd_running():
-                    daqdPid = subprocess.check_output(["pidof", "daqd"])
+                    daqdPid = subprocess.check_output(["pidof", "daqd"], universal_newlines=True)
                     self.__daqdPid = daqdPid.split(" ")[0]
                 else:
                     self.show_error_dialog("daqd server was unable to start correctly. Please check error message in the terminal and retry")
@@ -370,12 +378,12 @@ class GUI:
                     self.__daqd_switch_handle_set = False
                     return True
 
-                terminalPid = subprocess.check_output(["pidof", "xterm"])
+                terminalPid = subprocess.check_output(["pidof", "xterm"], universal_newlines=True)
                 terminalPids = terminalPid.split(" ")
                 for pid in terminalPids:
                     pid2 = pid.strip('\n')
                     command3 = "ps -o etime= -p \"%s\"" % pid2
-                    time =  subprocess.check_output(command3, shell=True ) 
+                    time =  subprocess.check_output(command3, shell=True, universal_newlines=True) 
                     time2 = time.strip('\n')
                     if time2.count(':') == 1 and time2.count('-')==0:
                         timeSec = sum(x * int(t) for x, t in zip([60, 1], time2.split(":")))
@@ -1163,7 +1171,7 @@ class GUI:
             return True
 
       
-        if fileName is "":
+        if fileName == "":
             self.builder.get_object("processingFileChooseEntry").set_text("")
             self.builder.get_object("processingFileChooseEntry1").set_text("")
             return True
@@ -1384,7 +1392,7 @@ class GUI:
         if fileName.endswith('.rawf'):
             fileName, ext = os.path.splitext(fileName)
         
-        if fileName is "":
+        if fileName == "":
             self.builder.get_object("processingFileChooseEntry1").set_text("")
             return True
         
