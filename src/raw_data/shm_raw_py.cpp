@@ -52,6 +52,7 @@ static object events_as_bytes(SHM_RAW &self, int start, int end)
 	}
 
 	PyObject* py_buf = PyBytes_FromStringAndSize((char *)buf, buffer_size);
+	free(buf);
 	object retval = object(handle<>(py_buf));
 	return retval;
 }
