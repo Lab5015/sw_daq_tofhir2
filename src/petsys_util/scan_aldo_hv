@@ -22,7 +22,7 @@ asics = [i[0] for i in keyChannels.keys()]
 asics = list(set(asics))
 
 def main(argv):
-
+        
 	parser = argparse.ArgumentParser(description='Acquire data for ALDO calibration')
 	parser.add_argument("--config", type=str, required=True, help="Configuration file")
 	parser.add_argument("-o", type=str, dest="fileNamePrefix", required=True, help="Data filename (prefix)")
@@ -77,7 +77,9 @@ def main(argv):
 	                
 	                mykey.closeChannel(keyChannels[(chipID,which_aldo)])
 	                
-			for aldo_range in [ "low", "high" ]:
+			#for aldo_range in [ "low", "high" ]:
+			#for aldo_range in [ "high" ]:
+			for aldo_range in [ "low" ]:
                                 
 				f = open("%s_ASIC%d_ALDO_%s_%s.tsv" % (args.fileNamePrefix, chipID, which_aldo, aldo_range), "w") 
 	                        print("%s_ASIC%d_ALDO_%s_%s.tsv" % (args.fileNamePrefix, chipID, which_aldo, aldo_range))			
@@ -103,6 +105,7 @@ def main(argv):
                                         
                                         #(_, voltage) = mykey.meas_V()
                                         voltage = mykey.read()
+                                        print(voltage)
                                         print which_aldo, dac, float(voltage)
                                         f.write("%d\t%f\n" % (dac, float(voltage)))
                                 f.close()

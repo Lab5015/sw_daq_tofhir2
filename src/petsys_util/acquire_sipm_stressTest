@@ -43,11 +43,12 @@ mykey = KeithleyDMM6500()
 mykey.closeChannel(int(args.keyChannel))
 mykey.read()
 las = None
+laserLabel = ''
 if args.laser:
     las = PiLas()
     lasState = 0
-    if args.laser:
-        las.set_state(lasState)
+    las.set_state(lasState)
+    laserLabel = '_laser'
 
 
 #-----------------------------
@@ -104,6 +105,7 @@ g_I = ROOT.TGraph()
 
 #--------
 # ov scan
+aldo = ''
 for portID, slaveID, chipID in activeAsics:
         if chipID%2 is not 0:
                 continue
@@ -119,10 +121,12 @@ for portID, slaveID, chipID in activeAsics:
             dac = systemConfig.mapALDOVoltageToDAC((portID, slaveID, chipID, 'A'),30.,args.bv-30.)
             gc.setValue("c_aldo_en", 0b10)
             gc.setValue("Valdo_A_DAC", dac)
+            aldo = 'aldoA'
         if args.aldoB and not args.aldoA:
             dac = systemConfig.mapALDOVoltageToDAC((portID, slaveID, chipID, 'B'),30.,args.bv-30.)
             gc.setValue("c_aldo_en", 0b01)
             gc.setValue("Valdo_B_DAC", dac)
+            aldo = 'aldoB'
         daqd.setAsicsConfig(cfg)
         
         sleep(1.)
@@ -179,7 +183,7 @@ if args.laser:
 now = datetime.now()
 this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
 os.system("mkdir ../log_stressTest/%s/"%args.label)
-outfile_name = ("../log_stressTest/%s/IV_bv%.2f_time_%s.root"%(args.label,args.bv,this_time))
+outfile_name = ("../log_stressTest/%s/IV_asic%d_%s_bv%.2f%s_time_%s.root"%(args.label,args.asic,aldo,args.bv,laserLabel,this_time))
 print('saving data to: %s' % outfile_name)
 
 outFile = TFile(outfile_name,"RECREATE")
