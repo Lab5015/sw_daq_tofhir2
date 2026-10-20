@@ -13,7 +13,7 @@ Last updated: 2026-10-19.
 | | CentOS 7 (`pc-mtd-mib01`) | AlmaLinux 9 (`pc-mtd-tray`) |
 |---|---|---|
 | OS / Python | CentOS 7.9, Python 2.7.5 | AlmaLinux 9.7, Python 3.9 |
-| Software | `~/DAQ/sw_daq_tofhir2b`, commit `42011d0` + local changes | this branch (Python 3 port of the same version) |
+| Software | `~/DAQ/sw_daq_tofhir2b`, commit `42011d0` + local changes | `tofhir2b-py3-alma9` (Python 3 port of the same version) |
 | FEB/D firmware | "old" firmware (`expect_reply = 0x01` protocol) | same firmware |
 | Status | works | **works**: `init_system`, also with `--config config/2C/...` |
 
@@ -28,7 +28,7 @@ Last updated: 2026-10-19.
 
 On `pc-mtd-mib01` several scripts were edited **directly in `build/`** instead of in `src/`. CMake copies scripts from
 `src/` into `build/` with `configure_file`, so the version actually used for data taking was not the one in git.
-These `build/` versions were imported into `src/petsys_util/` on this branch (and then ported to Python 3):
+These `build/` versions were imported into `src/petsys_util/` on the `tofhir2b-py3-alma9` branch (and then ported to Python 3):
 
 | Script | Main difference from `src/` |
 |---|---|
@@ -105,7 +105,7 @@ Apply/check these together with §2.2 when moving to the new firmware:
 ### 2.4 Procedure for a future firmware upgrade
 
 1. Program the FEB/D and the adapter with the files in `firmware/` from the GitHub version (`febd_working.bin`,
-   `adapter_working.bin`). **Warning:** after the upgrade the CentOS 7 software (and this branch) will no longer work
+   `adapter_working.bin`). **Warning:** after the upgrade the CentOS 7 software (and the `tofhir2b-py3-alma9` branch) will no longer work
    with the board.
 2. Use the `tofhir2b-py3-alma9-newfw` branch (Python 3 port of `9b03740`, already validated, see §5) and build it as in §3.
 3. With `daqd` running, from `build/` run:
