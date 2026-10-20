@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python3
 
 import sys
 import ROOT
@@ -53,4 +53,4 @@ for it in range(0, 4, 1):
     graph.SetMarkerColor(1+it%2)
     graph.Draw("PL,same")
 
-raw_input('ok?')
+input('ok?')

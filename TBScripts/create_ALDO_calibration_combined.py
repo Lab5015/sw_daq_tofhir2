@@ -24,7 +24,7 @@ for aldo in list_ALDO:
     for asic in list_ASIC:
         with open(map_input[asic][aldo], 'r') as f:
             for line in f:
-                print line
+                print(line)
                 readings = line.split()
                 line_out = '0\t0\t%d\t%3d\t%f\n' %(asic,int(readings[0]),float(readings[1]))
                 out.write(line_out)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import daqd, config
@@ -53,7 +53,7 @@ activeChannels = [ (portID, slaveID, chipID, channelID) for channelID in range(3
 
 # Adjust baseline
 
-for (portID, slaveID, chipID), ac in asicsConfig.items():
+for (portID, slaveID, chipID), ac in list(asicsConfig.items()):
 	if not ac: continue
 	gc = ac.globalConfig
 	
@@ -140,13 +140,13 @@ outFile.close()
 # Measure noise/baseline
 # 
 outFile = open(args.outFilePrefix + "_noise.tsv", "w")
-print "Scanning threshold for noise"
+print("Scanning threshold for noise")
 noiseProfiles = {}
 for thresholdIndex, thresholdName, baselineName in thresholdList:
 	stdout.write("%6s " % thresholdName); stdout.flush()
 
 	for thresholdValue in range(0,64, args.step):
-		for ac in asicsConfig.values():
+		for ac in list(asicsConfig.values()):
 			for cc in ac.channelConfig:
 				cc.setValue("cfg_a3_ith_t1", 63)
 				cc.setValue("cfg_a3_ith_t2", 63)
@@ -164,7 +164,7 @@ for thresholdIndex, thresholdName, baselineName in thresholdList:
 			
 			for portID, slaveID, chipID in activeAsics:
 				vv = daqd.read_mem_ctrl(portID, slaveID, 5, 8, 24, 32*chipID, 32)
-                                for channelID, v in enumerate(vv):
+				for channelID, v in enumerate(vv):
 					v = v / COUNT_MAX
 					outFile.write("%d\t%d\t%d\t%d\t%s\t%d\t%f\n" % (portID, slaveID, chipID, channelID, thresholdName, thresholdValue, v))
 					

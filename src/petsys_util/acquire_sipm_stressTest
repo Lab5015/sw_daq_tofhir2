@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import sys
 import os
 sys.path.insert(1, os.path.join(sys.path[0], '../build_new/'))
@@ -63,7 +63,7 @@ daqd.initializeSystem()
 systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_ON)
 
 hvdac_config = daqd.get_hvdac_config()                                                                                                                                                                                                                                                                                                                             
-for portID, slaveID, railID in hvdac_config.keys():                                                                                                                                                                                                                                                                                                                
+for portID, slaveID, railID in list(hvdac_config.keys()):                                                                                                                                                                                                                                                                                                                
     # set 48 V as ALDO input bias (should not exceed this value)                                                                                                                                                                                                                                                                                               
     hvdac_config[(portID, slaveID, railID)] = systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 46)                                                                                                                                                                                                                                           
 daqd.set_hvdac_config(hvdac_config)
@@ -94,7 +94,7 @@ for portID, slaveID, chipID in activeAsics:
             this_volt = mykey.read()
             this_curr = this_volt*1E06/10.
             sleep(0.5)
-            print( "ALDO off   V_meas: %.3f mV -->  I: %f uA" % (1000.*this_volt,this_curr))
+            print(( "ALDO off   V_meas: %.3f mV -->  I: %f uA" % (1000.*this_volt,this_curr)))
 
 
 #--------------
@@ -140,7 +140,7 @@ for portID, slaveID, chipID in activeAsics:
             tihs_volt = abs(this_volt)
             this_curr = this_volt*1E06/10.
             if verbose:
-                print ("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*this_volt,this_curr))
+                print(("dac: %3d   V_set: %6.3f V   V_meas: %.3f mV -->  I: %f uA" % (int(dac),volt,1000.*this_volt,this_curr)))
             g_I.SetPoint(g_I.GetN(),g_I.GetN(),this_curr)
                         
             timestamp_curr = datetime.now()
@@ -180,7 +180,7 @@ now = datetime.now()
 this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
 os.system("mkdir ../log_stressTest/%s/"%args.label)
 outfile_name = ("../log_stressTest/%s/IV_bv%.2f_time_%s.root"%(args.label,args.bv,this_time))
-print('saving data to: %s' % outfile_name)
+print(('saving data to: %s' % outfile_name))
 
 outFile = TFile(outfile_name,"RECREATE")
 outFile.cd()
@@ -203,4 +203,4 @@ if verbose:
     g_I.Fit(fitFunc_phot,'RNS')
     fitFunc_phot.SetLineColor(ROOT.kGreen)
     fitFunc_phot.Draw('same')
-    raw_input("ok?")
+    input("ok?")

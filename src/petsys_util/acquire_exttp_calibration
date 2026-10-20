@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import sys
@@ -26,7 +26,7 @@ def main(argv):
 	thlist = [10]
 
 	if args.scanth:
-			thlist = range(64)
+			thlist = list(range(64))
 
 	att=7
 	intime=2
@@ -47,10 +47,10 @@ def main(argv):
 			asicsConfig = deepcopy(asicsConfig0)
 			limit_reached = False
 			for ith in thlist:
-				for (portID, slaveID, chipID), ac in asicsConfig.items():
+				for (portID, slaveID, chipID), ac in list(asicsConfig.items()):
 					gc = ac.globalConfig
 
-					for tester in conn.get_testers().values():
+					for tester in list(conn.get_testers().values()):
 						# Usable DAC range for external injectors is 0x8000 to 0xFFFF
 						tester.injector_enable(channelID, amplitude)
 						
@@ -115,7 +115,7 @@ def main(argv):
 
 				if limit_reached: break
 				conn.setAsicsConfig(asicsConfig)
-				print("channelID = %2d - amplitude = %2d - ith = %2d" % (channelID, amplitude, ith))
+				print(("channelID = %2d - amplitude = %2d - ith = %2d" % (channelID, amplitude, ith)))
 				sleep(0.1)
 				conn.acquire(args.time, amplitude, ith)
 

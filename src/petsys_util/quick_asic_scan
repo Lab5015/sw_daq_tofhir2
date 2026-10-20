@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import daqd, config
@@ -15,9 +15,9 @@ parser.add_argument("-n", type=int, dest="expected", required=False, default=-1,
 
 args = parser.parse_args()
 
-print "****"
-v135_a = float(input("1V35 current (mA)? "))
-v270_a = float(input("2V7  current (mA)? "))
+print("****")
+v135_a = float(eval(input("1V35 current (mA)? ")))
+v270_a = float(eval(input("2V7  current (mA)? ")))
 
 daqd = daqd.Connection()
 daqd.initializeSystem()
@@ -30,13 +30,13 @@ for portID, slaveID, chipID in daqd.getActiveAsics():
 
 activeAsicsIDs = [ 32*64* portID + 64* slaveID + chipID for portID, slaveID, chipID in daqd.getActiveAsics() ]
 if len(activeAsicsIDs) == 0:
-	print "FAIL: No active ASICs found"
+	print("FAIL: No active ASICs found")
 	exit(1)
 
 
 if args.expected != -1:
 	if args.expected not in activeAsicsIDs:
-		print "ASIC %d not active" % args.expected
+		print("ASIC %d not active" % args.expected)
 		exit(1)
 		
 	expectedAsicList = [args.expected ]
@@ -48,8 +48,8 @@ for asicID in expectedAsicList:
 	f.write("%d\n" % asicID)
 f.close()
 
-v135_b = float(input("1V35 current (mA)? "))
-v270_b = float(input("2V7  current (mA)? "))
+v135_b = float(eval(input("1V35 current (mA)? ")))
+v270_b = float(eval(input("2V7  current (mA)? ")))
 current_file = open(args.outFilePrefix + "_current.txt", "w")
 current_file.write("%5.1f\t%5.1f\t%5.1f\t%5.1f\n" % (v135_a, v270_a, v135_b, v270_b))
 current_file.close()
@@ -65,7 +65,7 @@ baseAsicConfig = daqd.getAsicsConfig()
 ##
 # Set all channels to ToT mode and disable trigger
 tdcaAsicConfig = deepcopy(baseAsicConfig)
-for ac in tdcaAsicConfig.values():
+for ac in list(tdcaAsicConfig.values()):
 	gc = ac.globalConfig
 	for cc in ac.channelConfig:
 		cc.setValue("trigger_mode_1", 0b11)
@@ -80,7 +80,7 @@ K = 8
 phases = [ n / 4.0 for n in range(4) ]
 for firstChannel in range(0, K):
 	asicsConfig = deepcopy(tdcaAsicConfig)
-	for ac in asicsConfig.values():
+	for ac in list(asicsConfig.values()):
 		# Activate target channel
 		for channelID in range(firstChannel, 64, K):
 			cc = ac.channelConfig[channelID]
@@ -103,7 +103,7 @@ daqd.closeAcquisition()
 # Set all channels for QDCA mode with wide integration window
 # and disable trigger
 qdcaAsicConfig = deepcopy(baseAsicConfig)
-for ac in qdcaAsicConfig.values():
+for ac in list(qdcaAsicConfig.values()):
 	gc = ac.globalConfig
 	for cc in ac.channelConfig:
 		cc.setValue("trigger_mode_1", 0b11)
@@ -120,7 +120,7 @@ phases = [ n / 4.0 for n in range(4) ]
 lengths = [ 60, 80, 100 ]
 for firstChannel in range(0, K):
 	asicsConfig = deepcopy(qdcaAsicConfig)
-	for ac in asicsConfig.values():
+	for ac in list(asicsConfig.values()):
 		# Activate target channel
 		for channelID in range(firstChannel, 64, K):
 			cc = ac.channelConfig[channelID]
@@ -144,7 +144,7 @@ daqd.closeAcquisition()
 ## 3 phase
 ##
 fetpAsicConfig = deepcopy(baseAsicConfig)
-for ac in fetpAsicConfig.values():
+for ac in list(fetpAsicConfig.values()):
 	gc = ac.globalConfig
 	gc.setValue("disc_lsb_t1", 61)
 	gc.setValue("fetp_enable", 0b1)			# Enable FETP for ASIC
@@ -172,7 +172,7 @@ daqd.openRawAcquisition(args.outFilePrefix + "_fetp", calMode = True)
 phases = [ n / 3.0 for n in range(3) ]
 for channelID in range(64):
 	asicsConfig = deepcopy(fetpAsicConfig)
-	for ac in asicsConfig.values():
+	for ac in list(asicsConfig.values()):
 		# Activate target channel
 		cc = ac.channelConfig[channelID]
 		cc.setValue("fe_tp_en", 0b11)		# Enable FETP for channel
@@ -182,16 +182,16 @@ for channelID in range(64):
 		
 	daqd.setAsicsConfig(asicsConfig)
 
-	print "FETP channel %2d" % channelID
+	print("FETP channel %2d" % channelID)
 	for phase in phases:
 		daqd.set_test_pulse_febd(200, 400*1024, phase, False)
 		daqd.acquire(0.2, phase, 0)
 		
 daqd.closeAcquisition()
 
-print "Analyzing..."
+print("Analyzing...")
 result = subprocess.call(["./analyze_asic_quick_scan", "-i", args.outFilePrefix, "-o", args.outFilePrefix + "_log.txt"])
 if result == 0:
-	print "TEST PASS"
+	print("TEST PASS")
 else:
-	print "TEST FAIL"
+	print("TEST FAIL")

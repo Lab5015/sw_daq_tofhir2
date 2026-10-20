@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import tester_controller, config, spi, tofhir2b, tests
@@ -49,14 +49,14 @@ def main(argv):
 	time.sleep(1.0)
 
 	# Check that we have all expected testers
-	n_testers = len(conn.get_testers().keys())
+	n_testers = len(list(conn.get_testers().keys()))
 	if n_testers != args.n:
 		sys.stderr.write("Expected %d testers, found %d\n" % (args.n, n_testers))
 		exit(1)
 
 
 	uut_failures = {}
-	testers = [ (m,t) for (p,s,m),t in conn.get_testers().items() ]
+	testers = [ (m,t) for (p,s,m),t in list(conn.get_testers().items()) ]
 	testers = sorted(testers)
 
 	f1 = open("%s/list.txt" % args.o, "w")
@@ -64,13 +64,13 @@ def main(argv):
 		BAD_SN = "6959"
 		sn = BAD_SN
 		while sn == BAD_SN:
-			print "FE S/N for port %d?" % m
+			print("FE S/N for port %d?" % m)
 			termios.tcflush(sys.stdin, termios.TCIFLUSH)
-			sn = raw_input()
+			sn = input()
 			sn = sn.upper()
 			
 			if sn == BAD_SN:
-				print "INVALID SERIAL NUMBER: ", sn
+				print("INVALID SERIAL NUMBER: ", sn)
 			
 		f1.write("%d\t%s\n" % (m, sn))
 
@@ -137,13 +137,13 @@ def main(argv):
 
 	# Give the user the chance to abort before longer tests start
 	if uut_failures != []:
-		print "Some boards have failures"
-		for m, s in uut_failures.items():
-			print m, s
+		print("Some boards have failures")
+		for m, s in list(uut_failures.items()):
+			print(m, s)
 
-		print "Abort? (Y/N)"
+		print("Abort? (Y/N)")
 		termios.tcflush(sys.stdin, termios.TCIFLUSH)
-		abort = raw_input().upper()
+		abort = input().upper()
 
 		if abort == "Y":
 			conn.set_uut_power(False)
@@ -161,15 +161,15 @@ def main(argv):
 	extp_amp_list = [ 0xFFFF ]
 	fetp_amp_list = [ v for v in range(3, 32, 4) ]
 	
-	assert xxtp_att in qdc_att_list.keys()
+	assert xxtp_att in list(qdc_att_list.keys())
 
 	
-	for disc_range, mode in disc_range_list.items():
+	for disc_range, mode in list(disc_range_list.items()):
 		uut_failures = merge_failures_MS(uut_failures, tests.check_discriminators(conn, MS(testers), disc_range, mode, args.o))
 		
 	uut_failures = merge_failures_MS(uut_failures, tests.check_tdc(conn, MS(testers), "full", args.o))
 	
-	for att, mode in qdc_att_list.items():
+	for att, mode in list(qdc_att_list.items()):
 		uut_failures = merge_failures_MS(uut_failures, tests.check_qdc(conn, MS(testers), att, mode, args.o))
 		
 	uut_failures = merge_failures_MS(uut_failures, tests.check_fetp_tres(conn, MS(testers), xxtp_att, args.o, fe_mode=True))
@@ -208,14 +208,14 @@ def main(argv):
 
 	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
 	
-	for m, failures in uut_failures.items():
+	for m, failures in list(uut_failures.items()):
 		detailed_results_file.write("%d\t%s\n" % (m, ("\t").join(failures)))
 
 	detailed_results_file.close()
 	
 
-	print testers
-	print uut_failures
+	print(testers)
+	print(uut_failures)
 	
 	# Test sucessfully complete
 	conn.set_uut_power(False)	
@@ -226,9 +226,9 @@ def main(argv):
 
 def merge_failures(a, b):
 	c = {}
-	for k in a.keys():
+	for k in list(a.keys()):
 		c[k] = a[k]
-		if b.has_key(k):
+		if k in b:
 			a[k] += b[k]
 	
 	return c
@@ -244,10 +244,10 @@ def disable_failed(testers, uut_failures):
 
 def merge_failures_MS(a, b):
 	c = {}
-	for m in a.keys():
+	for m in list(a.keys()):
 		c[m] = a[m]
 		for k in [0,1]:
-			if b.has_key((m,k)):
+			if (m,k) in b:
 				a[m] += [ "ASIC %d " % k + failure for failure in b[m,k] ]
 	return c
 
@@ -261,11 +261,11 @@ def do_tester_check(conn):
 		tester_vin = t.get_tester_vin()
 		
 		if tester_vin < 1.6:
-			print "Tester %d Vin %3.2f is LOW" % (m, tester_vin)
+			print("Tester %d Vin %3.2f is LOW" % (m, tester_vin))
 			problems = True
 			
 		if tester_vin > 2.5:			
-			print "Tester %d Vin %3.2f is HIGH" % (m, tester_vin)
+			print("Tester %d Vin %3.2f is HIGH" % (m, tester_vin))
 			problems = True
 			
 			
@@ -275,16 +275,16 @@ def do_tester_check(conn):
 		uut_vin = t.get_uut_vin()
 		
 		if uut_vin < 1.6:
-			print "Tester %d UUT Vin %3.2f is LOW" % (m, uut_vin)
+			print("Tester %d UUT Vin %3.2f is LOW" % (m, uut_vin))
 			problems = True
 			
 		if uut_vin > 2.5:
-			print "Tester %d UUT Vin %3.2f is HIGH" % (m, uut_vin)
+			print("Tester %d UUT Vin %3.2f is HIGH" % (m, uut_vin))
 			problems = True
 	
 	
 	if problems:
-		print "PROBLEMS FOUND IN TEST SYSTEM"
+		print("PROBLEMS FOUND IN TEST SYSTEM")
 		exit(1)
 
 	

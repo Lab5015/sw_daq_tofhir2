@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python3
 
 import os
 import sys
@@ -29,11 +29,11 @@ for point in range(g_IV.GetN()):
     gain = (ov_eff+0.25)*(12.7+3.2)/1.602/0.0001
     graph_IVeff_TB.SetPoint(point,ov_eff,y/1000.)
     graph_DCR_TB.SetPoint(point,ov_eff,y*1E-06/16./gain/1.602E-19/1E09)
-    print 'OV_set=%.02f   OV_eff = %.02f   I_array = %.01f    DCR = %.01f'%(x-float(options.Vbr), ov_eff, y/1000., y*1E-06/16./gain/1.602E-19/1E09)
+    print('OV_set=%.02f   OV_eff = %.02f   I_array = %.01f    DCR = %.01f'%(x-float(options.Vbr), ov_eff, y/1000., y*1E-06/16./gain/1.602E-19/1E09))
 
-print 'I_array at Vov_eff = 1.5 V : ', graph_IVeff_TB.Eval(1.5)
-print 'I_SiPM  at Vov_eff = 1.5 V : ', graph_IVeff_TB.Eval(1.5)/16.
-print 'DCR  at Vov_eff = 1.5 V : ', graph_DCR_TB.Eval(1.5)
+print('I_array at Vov_eff = 1.5 V : ', graph_IVeff_TB.Eval(1.5))
+print('I_SiPM  at Vov_eff = 1.5 V : ', graph_IVeff_TB.Eval(1.5)/16.)
+print('DCR  at Vov_eff = 1.5 V : ', graph_DCR_TB.Eval(1.5))
 
 c1 = ROOT.TCanvas('','',1300,600)
 c1.Divide(2,1)
@@ -81,4 +81,4 @@ graph_DCR_TB.SetMarkerStyle(20)
 graph_DCR_TB.SetMarkerSize(1.)
 graph_DCR_TB.Draw('PL,same')
 
-raw_input('ok?')
+input('ok?')

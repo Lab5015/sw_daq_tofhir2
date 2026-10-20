@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
 import argparse
@@ -13,7 +13,7 @@ def main(argv):
 	parser.add_argument("-o", type=str, required=True, help="Output file name")
 
 	parser.add_argument("--channel", default=0, type=int, help="Channel ID")
-        parser.add_argument("--ith_t1", type=int, dest="ith_t1", required=False, help="vth T1 value")
+	parser.add_argument("--ith_t1", type=int, dest="ith_t1", required=False, help="vth T1 value")
 
 	args = parser.parse_args()
 
@@ -34,7 +34,7 @@ def main(argv):
 
 	# Modify the ASIC configurations as needed.
 	# Example: For every ASIC, set the thresholds of a channel
-	for (ccLink, ccPort, chipID), ac in asicsConfig.items():
+	for (ccLink, ccPort, chipID), ac in list(asicsConfig.items()):
 		cc = ac.channelConfig[args.channel]
 
 		if args.ith_t1 is not None: cc.setValue("cfg_a3_ith_t1", args.ith_t1)
@@ -53,7 +53,7 @@ def write_json(asicsConfig, outputFileName):
 
 	outputFile = open(outputFileName, "w")
 
-	targetAsics = asicsConfig.keys()
+	targetAsics = list(asicsConfig.keys())
 	targetAsics.sort()
 
 

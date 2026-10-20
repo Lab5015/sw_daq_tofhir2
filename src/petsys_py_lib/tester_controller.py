@@ -1,6 +1,6 @@
-import daqd, tester_common
-import fe_tester, bga_tester
-import spi, i2c
+from . import daqd, tester_common
+from . import fe_tester, bga_tester
+from . import spi, i2c
 import time
 
 class Connection(daqd.Connection):
@@ -29,7 +29,7 @@ class Connection(daqd.Connection):
 						self.__testers[(portID, slaveID, module)] = bga_tester.Tester(self, portID, slaveID, module)
 
 					else:
-						print "ERROR: Unknown Tester at (%2d %2d %d): %s" % (portID, slaveID, module, adc_test_result)
+						print("ERROR: Unknown Tester at (%2d %2d %d): %s" % (portID, slaveID, module, adc_test_result))
 						exit(1)
 
 
@@ -50,7 +50,7 @@ class Connection(daqd.Connection):
 			time.sleep(1.0)
 
 		wait_for_power = False
-		for key, tester in self.get_testers().items():
+		for key, tester in list(self.get_testers().items()):
 				pwr_en = tester.get_uut_power()
 				if pwr_en is False and on:
 					wait_for_power = True

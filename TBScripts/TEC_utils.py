@@ -22,7 +22,7 @@ class Keithley2231A():
     """
 
     def __init__(self, portName='ASRL/dev/ttyUSB0::INSTR', chName="CH1"):
-        print('***',portName,chName)
+        print(('***',portName,chName))
         self.instr = pyvisa.ResourceManager().open_resource(portName)
         self.chName = chName
         self.instr.write("SYSTem:REMote")
@@ -30,7 +30,7 @@ class Keithley2231A():
 
     def query(self, query):
         """Pass a query to the power supply"""
-        print(self.instr.query(query).strip())
+        print((self.instr.query(query).strip()))
 
     def meas_V(self):
         """read set voltage"""

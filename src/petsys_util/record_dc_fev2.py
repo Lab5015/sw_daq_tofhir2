@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 from petsys import daqd, tofhir2
@@ -26,7 +26,7 @@ def read_multimeter(port):
 
 def set_monitor_mux(conn, mux_sel):
 	asicsConfig = conn.getAsicsConfig()
-	for ac in asicsConfig.values():
+	for ac in list(asicsConfig.values()):
 		gc = ac.globalConfig
 		gc.setValue("MUX_EN", 1)
 		gc.setValue("MUX_SEL", mux_sel)
@@ -35,20 +35,20 @@ def set_monitor_mux(conn, mux_sel):
 	
 	
 def scan_global(conn, multimeter, file_name, cfg_name, cfg_min, cfg_max, cfg_step):
-	print "Scanning %s [%d, %d]" % (cfg_name, cfg_min, cfg_max)
+	print("Scanning %s [%d, %d]" % (cfg_name, cfg_min, cfg_max))
 	output_file = open(file_name, "w")
 	
 	read_multimeter(multimeter)
 	for cfg_value in range(cfg_min, cfg_max, cfg_step):
 		asicsConfig = conn.getAsicsConfig()
-		for ac in asicsConfig.values():
+		for ac in list(asicsConfig.values()):
 			gc = ac.globalConfig
 			gc.setValue(cfg_name, cfg_value)
 		
 		conn.setAsicsConfig(asicsConfig)
 		voltage = read_multimeter(multimeter)
 		
-		print "%3d -> %6.4f" % (cfg_value, voltage)
+		print("%3d -> %6.4f" % (cfg_value, voltage))
 		output_file.write("%d\t%f\n" % (cfg_value, voltage))
 	
 	output_file.close()
@@ -56,20 +56,20 @@ def scan_global(conn, multimeter, file_name, cfg_name, cfg_min, cfg_max, cfg_ste
 
 def scan_ch15(conn, multimeter, file_name, cfg_name, cfg_min, cfg_max, cfg_step):
 	
-	print "Scanning %s [%d, %d]" % (cfg_name, cfg_min, cfg_max)
+	print("Scanning %s [%d, %d]" % (cfg_name, cfg_min, cfg_max))
 	output_file = open(file_name, "w")
 	
 	read_multimeter(multimeter)
 	for cfg_value in range(cfg_min, cfg_max, cfg_step):
 		asicsConfig = conn.getAsicsConfig()
-		for ac in asicsConfig.values():
+		for ac in list(asicsConfig.values()):
 			cc = ac.channelConfig[15]
 			cc.setValue(cfg_name, cfg_value)
 		
 		conn.setAsicsConfig(asicsConfig)
 		voltage = read_multimeter(multimeter)
 		
-		print "%3d -> %6.4f" % (cfg_value, voltage)
+		print("%3d -> %6.4f" % (cfg_value, voltage))
 		output_file.write("%d\t%f\n" % (cfg_value, voltage))
 	
 	output_file.close()
@@ -95,8 +95,8 @@ def main(argv):
 	activeBoards = list(activeBoards)
 
 	for board in activeBoards:
-		print "CONNECT CABLE TO BOARD at port %d" % board
-		raw_input("Press ENTER to continue")
+		print("CONNECT CABLE TO BOARD at port %d" % board)
+		input("Press ENTER to continue")
 
 		for chipID in [ 2*board + n for n in range(0, 2) ]:
 			if chipID not in activeAsics: continue
@@ -106,23 +106,23 @@ def main(argv):
 			output_file.write("%d\n" % asicsConfig0[(0, 0, chipID)].globalConfig.getValue("Iref_cal_DAC"))
 
 
-			print "CONNECT MULTIMETER TO ASIC %d BANDGAP" % chipID
-			print "Check voltage is ~250-350 mV (press 'Local' if needed)"
-			raw_input("Press ENTER to continue")
+			print("CONNECT MULTIMETER TO ASIC %d BANDGAP" % chipID)
+			print("Check voltage is ~250-350 mV (press 'Local' if needed)")
+			input("Press ENTER to continue")
 
 			conn.setAsicsConfig(asicsConfig0)
 			output_file = open(os.path.join(dir_name, "A%d_bandgap.txt" % chipID), "w")
 			voltage = read_multimeter(multimeter)
-			print "Bandgap voltage = %4.4f V" % voltage
+			print("Bandgap voltage = %4.4f V" % voltage)
 			output_file.write("%f\n" % voltage)
 			output_file.close()
 
 
 			conn.setAsicsConfig(asicsConfig0)
 			set_monitor_mux(conn, 0)
-			print "CONNECT MULTIMETER TO ASIC %d MONITOR" % chipID
-			print "Check voltage is ~700-800 mV (press 'Local' if needed)"
-			raw_input("Press ENTER to continue")
+			print("CONNECT MULTIMETER TO ASIC %d MONITOR" % chipID)
+			print("Check voltage is ~700-800 mV (press 'Local' if needed)")
+			input("Press ENTER to continue")
 
 			conn.setAsicsConfig(asicsConfig0)
 			set_monitor_mux(conn, 1)

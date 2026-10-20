@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -835,11 +835,11 @@ class GUI:
         countTrigger = Counter([trigger for (port,slave,trigger,biastype,biasFile) in self.__febdTopology])
         countFiles = Counter([("FEB/D_64P" == biastype, biasFile) for (port,slave,trigger,biastype,biasFile) in self.__febdTopology])            
               
-        if any(count > 1 for count in countPorts.values()):
+        if any(count > 1 for count in list(countPorts.values())):
             self.show_error_dialog("Each FEB/D should have a unique pair of (portID,slaveID).")
             return False
         
-        if any(count > 1 for count in countTrigger.values()) and self.__hasClockTrigger:
+        if any(count > 1 for count in list(countTrigger.values())) and self.__hasClockTrigger:
             self.show_error_dialog("Each FEB/D should have a unique triggerID value.")
             return False
 

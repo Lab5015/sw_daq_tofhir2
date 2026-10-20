@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python3
 
 import sys
 import ROOT
@@ -153,4 +153,4 @@ for it in range(0, 4, 1):
 
 gPad.BuildLegend()
 
-raw_input('ok?')
+input('ok?')

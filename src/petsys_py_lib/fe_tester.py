@@ -1,6 +1,6 @@
-from tester_common import TesterPowerException
-import spi
-import i2c
+from .tester_common import TesterPowerException
+from . import spi
+from . import i2c
 import time
 
 class Tester(object):
@@ -23,7 +23,7 @@ class Tester(object):
 
 			iin = self.get_uut_iin()
 			if iin > 1.2:
-				print "WARNING: Tester (%d, %d) UUT input current is above 1.2A and will be disabled" % (self.__p, self.__s, self.__m, iin)
+				print("WARNING: Tester (%d, %d) UUT input current is above 1.2A and will be disabled" % (self.__p, self.__s, self.__m, iin))
 				self.set_uut_power(False)
 				
 	

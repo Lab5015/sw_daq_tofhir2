@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import daqd, config
@@ -81,7 +81,7 @@ for portID, slaveID, chipID in activeAsics:
     stdout = mykey.read()
     sleep(2)
     
-    print( "ALDO off   I: %f uA" % (abs(stdout)*1E06/10.))
+    print(( "ALDO off   I: %f uA" % (abs(stdout)*1E06/10.)))
 
 
 #--------------
@@ -94,7 +94,7 @@ g_dlogIdV = ROOT.TGraph()
 logfolder = '../log_IV/'
 if not os.path.exists(logfolder):
     os.mkdir(logfolder)
-    print logfolder
+    print(logfolder)
 
 
 #--------
@@ -105,7 +105,7 @@ for portID, slaveID, chipID in activeAsics:
         if int(chipID) != args.asic:
             continue
         
-        print(portID,slaveID,chipID)
+        print((portID,slaveID,chipID))
         
         ac = cfg[(portID, slaveID, chipID)]
         for dac in range(0,256,args.dacStep):
@@ -163,7 +163,7 @@ for portID, slaveID, chipID in activeAsics:
                         this_curr = this_volt*1E06/10.
 
                         if verbose:
-                            print ("dac: %3d   V_set: %6.3f V   V_meas: %f V -->  I: %f uA" % (int(dac),volt,this_volt,this_curr))
+                            print(("dac: %3d   V_set: %6.3f V   V_meas: %f V -->  I: %f uA" % (int(dac),volt,this_volt,this_curr)))
                         g_I[volt].SetPoint(g_I[volt].GetN(),g_I[volt].GetN(),this_curr)
                         
                         if it >= 0:
@@ -185,7 +185,7 @@ for portID, slaveID, chipID in activeAsics:
                 curr  = curr  / nMeas
                 vMeas = vMeas / nMeas
                 g_IV.SetPoint(g_IV.GetN(),volt, curr)
-                print( "===> dac: %3d   V_set: %6.3f V_meas: %6.3f V -->  I: %f uA" % (int(dac),volt,vMeas,curr))
+                print(( "===> dac: %3d   V_set: %6.3f V_meas: %6.3f V -->  I: %f uA" % (int(dac),volt,vMeas,curr)))
 
 
 #-------------------------
@@ -218,17 +218,17 @@ if args.plot:
     g_dlogIdV.SetTitle("dlogIdV vs volt;volt [V]; #DeltalogI/#DeltaV [#muA/V]")
     g_dlogIdV.Draw("APL")
     
-    raw_input("ok?")
+    input("ok?")
 
 now = datetime.now()
 this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
 
 logfile = '%s/logIV_%s_ASIC%d_ALDO%s_time_%s'%(logfolder,args.label,args.asic,args.aldo,this_time)+'.root'
-print('saving data to: %s' % logfile)
+print(('saving data to: %s' % logfile))
 
 outFile = ROOT.TFile(logfile,"RECREATE")
 outFile.cd()
-for volt in g_I.keys():
+for volt in list(g_I.keys()):
     g_I[volt].SetName('g_I_bv%.2f'%volt)
     g_I[volt].Write()
 g_IV.SetName("g_IV")

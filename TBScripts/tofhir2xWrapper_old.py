@@ -44,7 +44,7 @@ class tofhir:
         if aldo:
             self.aldo=aldo
             self.hvdac_config = self.daqd.get_hvdac_config()
-            for portID, slaveID, railID in self.hvdac_config.keys():
+            for portID, slaveID, railID in list(self.hvdac_config.keys()):
                 # set 48 V as ALDO input bias (should not exceed this value)
                 self.hvdac_config[(portID, slaveID, railID)] = self.systemConfig.mapBiasChannelVoltageToDAC((portID, slaveID, railID), 48)
             self.daqd.set_hvdac_config(self.hvdac_config)
@@ -52,7 +52,7 @@ class tofhir:
     def configTrigger(self):
         # trigger modes
         if self.trigger == "none":
-            print "### self-triggering mode ###"
+            print("### self-triggering mode ###")
         if self.trigger == "int":
             # Enable INTERNAL triggers from FEB/D to J15
             self.daqd.write_config_register_tgr(8, 0x21A, 0x81)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import sys
@@ -45,8 +45,8 @@ def main(argv):
         parser.add_option("--useTECs", default = '')
         (options,args)=parser.parse_args()
 
-	conn = daqd.Connection()
-	ltc2984_cfg_channels(conn)
+        conn = daqd.Connection()
+        ltc2984_cfg_channels(conn)
 	
         f = open("/data1/cmsdaq/tofhir2/conf", "r")
         conf = float(f.read())
@@ -58,7 +58,7 @@ def main(argv):
         logfolder = '/home/cmsdaq/DAQ/tofhir/sw_daq_tofhir2b_jun22/logs_%.2f/'%conf
         if not os.path.exists(logfolder):
                 os.mkdir(logfolder)
-        print logfolder
+        print(logfolder)
         logfile = '%s/logTECs_'%logfolder+str(options.run)+'.txt'
         
         logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S',filename=logfile,level=logging.INFO)
@@ -124,4 +124,4 @@ def main(argv):
         
 
 if __name__ == '__main__':
-	sys.exit(main(sys.argv))
+        sys.exit(main(sys.argv))

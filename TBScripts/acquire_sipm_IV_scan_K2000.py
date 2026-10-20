@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -46,7 +46,7 @@ if args.verb:
 #---------------------------------
 # connect and configure multimeter
 keithley = K2000('tcp://raspcmsroma01:8820')
-print("logging SiPM current from Keithley channel number %d "%(int(args.ch)))
+print(("logging SiPM current from Keithley channel number %d "%(int(args.ch))))
 keithley.selectChannel(int(args.ch))
 
 
@@ -93,7 +93,7 @@ for portID, slaveID, chipID in activeAsics:
         stdout = keithley.getMeasure()
         sleep(2)
         
-        print( "ALDO off   I: %f uA" % (abs(float(stdout.strip()))*1E06/10.))
+        print(( "ALDO off   I: %f uA" % (abs(float(stdout.strip()))*1E06/10.)))
 
 
 #--------------
@@ -106,14 +106,14 @@ g_dlogIdV = ROOT.TGraph()
 logfolder = '/home/cmsdaq/DAQ/tofhir/sw_daq_tofhir2b_jun22/logs_%.2f/'%conf
 if not os.path.exists(logfolder):
     os.mkdir(logfolder)
-print logfolder
+print(logfolder)
 
 
 #--------------------------------
 # print ALDO calibrations to file
 if (args.calib):
     conf_folder = '/home/cmsdaq/DAQ/tofhir/sw_daq_tofhir2b_jun22/config_%.2f/'%conf
-    print conf_folder
+    print(conf_folder)
     f_aldo = open('%s/aldo_scan_ASIC%d_ALDO%s'%(conf_folder,int(args.asic),args.aldo)+'.txt', "w")
 
 
@@ -125,7 +125,7 @@ for portID, slaveID, chipID in activeAsics:
         if int(chipID) != args.asic:
             continue
         
-        print(portID,slaveID,chipID)
+        print((portID,slaveID,chipID))
         
         ac = cfg[(portID, slaveID, chipID)]
         for dac in range(0,256,args.dacStep):
@@ -174,7 +174,7 @@ for portID, slaveID, chipID in activeAsics:
                     nMeas = int(args.nMeas)
                 if (not args.fast and not args.calib):
                     nMeas = 1 + int((start_curr/16.)*10)                    
-                    print(start_curr,nMeas)
+                    print((start_curr,nMeas))
                 
                 it = 0
                 for _ in range(nMeas):
@@ -185,9 +185,9 @@ for portID, slaveID, chipID in activeAsics:
 
                         if verbose:
                             if (not args.calib):
-                                print ("dac: %3d   V_set: %6.3f V   V_meas: %f V -->  I: %f uA" % (int(dac),volt,this_volt,this_curr))
+                                print(("dac: %3d   V_set: %6.3f V   V_meas: %f V -->  I: %f uA" % (int(dac),volt,this_volt,this_curr)))
                             else:
-                                print ("dac: %3d   V_meas: %f V" % (int(dac),this_volt))
+                                print(("dac: %3d   V_meas: %f V" % (int(dac),this_volt)))
                         if (not args.calib):
                             g_I[volt].SetPoint(g_I[volt].GetN(),g_I[volt].GetN(),this_curr)
                         else:
@@ -213,10 +213,10 @@ for portID, slaveID, chipID in activeAsics:
                 vMeas = vMeas / nMeas
                 if (not args.calib):
                     g_IV.SetPoint(g_IV.GetN(),volt, curr)
-                    print( "===> dac: %3d   V_set: %6.3f V_meas: %6.3f V -->  I: %f uA" % (int(dac),volt,vMeas,curr))
+                    print(( "===> dac: %3d   V_set: %6.3f V_meas: %6.3f V -->  I: %f uA" % (int(dac),volt,vMeas,curr)))
                 else:
                     g_IV.SetPoint(g_IV.GetN(),int(dac), vMeas)
-                    print( "%3d\t%f"%(int(dac),vMeas) )
+                    print(( "%3d\t%f"%(int(dac),vMeas) ))
                     f_aldo.write( "%3d\t%f\n"%(int(dac),vMeas) )
 
 
@@ -250,7 +250,7 @@ if args.plot:
     g_dlogIdV.SetTitle("dlogIdV vs volt;volt [V]; #DeltalogI/#deltaV [#muA/V]")
     g_dlogIdV.Draw("APL")
     
-    raw_input("ok?")
+    input("ok?")
 
 now = datetime.now()
 this_time = now.strftime('%Y-%m-%d_%H:%M:%S')
@@ -259,11 +259,11 @@ if not args.label:
 
 if(not args.calib):
     logfile = '%s/logIV_ASIC%d_ALDO%s_ch%d_time_%s'%(logfolder,int(args.asic),args.aldo,int(args.ch),this_time)+'.root'
-    print('saving data to: %s' % logfile)
+    print(('saving data to: %s' % logfile))
     
     outFile = TFile(logfile,"RECREATE")
     outFile.cd()
-    for volt in g_I.keys():
+    for volt in list(g_I.keys()):
         g_I[volt].SetName('g_I_bv%.2f'%volt)
         g_I[volt].Write()
     g_IV.SetName("g_IV")

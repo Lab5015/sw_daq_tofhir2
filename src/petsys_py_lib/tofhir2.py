@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from bitarray import bitarray
-from bitarray_utils import intToBin, binToInt, grayToBin, grayToInt
+from .bitarray_utils import intToBin, binToInt, grayToBin, grayToInt
 import sys
 
 
@@ -95,12 +95,12 @@ class AbstractConfig(bitarray):
 
 	## Prints the content of all parameters as a bitarray	
 	def printAllBits(self):
-		for key in self.fields.keys():
-			print key, " : ", self.getBits(key)
+		for key in list(self.fields.keys()):
+			print(key, " : ", self.getBits(key))
 
 	## Prints the content of all parameters as integers
 	def printAllValues(self):
-		unsorted = [ (min(bitList), name) for name, bitList in self.fields.items() ]
+		unsorted = [ (min(bitList), name) for name, bitList in list(self.fields.items()) ]
 		unsorted.sort()
 		for b, key in unsorted:
 			bitList = self.fields[key]
@@ -110,11 +110,11 @@ class AbstractConfig(bitarray):
 			c_decimal = "%d'd%d" % (len(bitList), self.getValue(key))
 			c_binary = format(self.getValue(key), "0%db" % len(bitList))
 			c_binary = "%d'b%s" % (len(bitList), c_binary)
-			print "// [%03d:%03d] %-30s (default %6s | %10s )" % (l, r, key, c_decimal, c_binary)
+			print("// [%03d:%03d] %-30s (default %6s | %10s )" % (l, r, key, c_decimal, c_binary))
 
 	## Returns all the keys (variables) in this class
 	def getKeys(self):
-		return self.fields.keys()
+		return list(self.fields.keys())
 	
 class ConfigurationError(Exception):
 	pass

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from bitarray import bitarray
-from bitarray_utils import intToBin, binToInt, grayToBin, grayToInt
+from .bitarray_utils import intToBin, binToInt, grayToBin, grayToInt
 import sys
 from .tofhir2 import *
 
@@ -114,7 +114,7 @@ class AsicGlobalConfig(AbstractConfig):
 		return AsicGlobalConfig(initial=self)
 
 
-		return self.fields.keys()
+		return list(self.fields.keys())
 
 def __MAKE_DEFAULT_ASIC_CONFIG_TX():
 	fields_d3 = [
@@ -161,7 +161,7 @@ class AsicGlobalConfigTX(AbstractConfig):
 		return AsicGlobalConfigTX(initial=self)
 
 
-		return self.fields.keys()
+		return list(self.fields.keys())
 
 def __MAKE_DEFAULT_ASIC_GLOBAL_CONFIG_STATUS():
 	fields_d3 = [
@@ -211,7 +211,7 @@ class AsicGlobalConfigStatus(AbstractConfig):
 		return AsicGlobalConfigStatus(initial=self)
 
 
-		return self.fields.keys()
+		return list(self.fields.keys())
 
 ## Contains parameters and methods related to the operation of one channel of the ASIC.
 def __MAKE_DEFAULT_ASIC_CHANNEL_CONFIG():

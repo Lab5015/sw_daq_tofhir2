@@ -21,7 +21,7 @@ def fe_check_current(conn, ts, ILOW, IHIGH, when, fname):
 	return results
 
 def bga_check_current(conn, sockets, ILOW, IHIGH, when, fname):
-	print "BGA CHECK CURRENT"
+	print("BGA CHECK CURRENT")
 	results = {}
 	f = open(fname, "w")
 	for m, a, t in sockets:
@@ -38,7 +38,7 @@ def bga_check_current(conn, sockets, ILOW, IHIGH, when, fname):
 	return results
 	
 def bga_check_reset_n(conn, sockets):
-	print "BGA CHECK RESET"
+	print("BGA CHECK RESET")
 	results = {}
 	
 	for m,a,t in sockets:
@@ -48,7 +48,7 @@ def bga_check_reset_n(conn, sockets):
 	asicsConfig = conn.getAsicsConfig()
 	
 	for m,a,t in sockets:
-		if (0,0,2*m+a) in asicsConfig.keys():
+		if (0,0,2*m+a) in list(asicsConfig.keys()):
 			results[m,a] = [ "RESET_N FAIL" ]
 
 	for m,a,t in sockets:
@@ -58,18 +58,18 @@ def bga_check_reset_n(conn, sockets):
 	
 
 def check_asic_communication(conn, sockets):
-	print "CHECK ASIC COMMUNICATION"
+	print("CHECK ASIC COMMUNICATION")
 	results = {}
 	conn.initializeSystem()
 	asicsConfig = conn.getAsicsConfig()
 	for m,a,t in sockets:
-		if (0,0,2*m+a) not in asicsConfig.keys():
+		if (0,0,2*m+a) not in list(asicsConfig.keys()):
 			results[m,a] = [ "NO COMMUNICATION" ]
 
 	return results
 
 def bga_do_bg_trim(conn, sockets):
-	print "DO BG TRIM"
+	print("DO BG TRIM")
 	TRIM_OPTIONS = { 
 		7       : -12.28E-3,
 		6       : -12.32E-3,
@@ -103,7 +103,7 @@ def bga_do_bg_trim(conn, sockets):
 			expected_voltage = value + 1E6
 			selected_option_error = abs(value - target)
 			
-			for option, delta in current_trim_options.items():
+			for option, delta in list(current_trim_options.items()):
 
 				# If current value is above target + 4 mV, consider only negative trim options
 				if (value > (target + 4e-3)) and (delta >= 0): continue
@@ -141,7 +141,7 @@ def bga_do_bg_trim(conn, sockets):
 
 
 def bga_check_bg_trim(conn, sockets, fname):
-	print "CHECK BG TRIM"
+	print("CHECK BG TRIM")
 	results = {}
 	f = open(fname, "w")
 	for m,a,t in sockets:
@@ -154,10 +154,10 @@ def bga_check_bg_trim(conn, sockets, fname):
 	return results
 
 def check_itrim(conn, sockets, fname, acquire=True):
-	print "CHECK REF CURRENT TRIM"
+	print("CHECK REF CURRENT TRIM")
 	
 	results = {}
-        if acquire:
+	if acquire:
 			f = open(fname, "w")
 			conn.initializeSystem()
 			asicsConfig = conn.getAsicsConfig()
@@ -171,7 +171,7 @@ def check_itrim(conn, sockets, fname, acquire=True):
 	return results
 
 def bga_check_id(conn, sockets):
-	print "CHECK ASIC ID SETTING"
+	print("CHECK ASIC ID SETTING")
 	results = {}
 	
 	## Test other communication features
@@ -193,7 +193,7 @@ def bga_check_id(conn, sockets):
 
 
 def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
-	print "CHECK RX PHASE SELECTION"
+	print("CHECK RX PHASE SELECTION")
 
 	# This test fails on read_csv if there are no active sockets
 	if sockets == []: return {}
@@ -309,7 +309,7 @@ def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
 	cmd_failed = cmd_fail_count.loc[(cmd_fail_count["count"] > 0) & (cmd_fail_count["phase"] > SPLIT)]
 	cmd_failed = cmd_failed.groupby(["m", "a"])["phase"].agg(["min", "max", delta ]).reset_index()
 	cmd_failed = cmd_failed.set_index(['m','a']).T.to_dict()
-	for (m,a) in cmd_failed.keys():
+	for (m,a) in list(cmd_failed.keys()):
 		v = cmd_failed[(m,a)]['delta']
 		if v > 0:
 			results[ int(m), int(a)] = [ "RX PHASE FAIL DELTA2 %5.3f > 0.0" % v ]
@@ -319,7 +319,7 @@ def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
 	cmd_failed = cmd_fail_count.loc[(cmd_fail_count["count"] > 0) & (cmd_fail_count["phase"] <= SPLIT)]
 	cmd_failed = cmd_failed.groupby(["m", "a"])["phase"].agg(["min", "max", delta ]).reset_index()
 	cmd_failed = cmd_failed.set_index(['m','a']).T.to_dict()
-	for (m,a) in cmd_failed.keys():
+	for (m,a) in list(cmd_failed.keys()):
 		v = cmd_failed[(m,a)]['min']
 		if v < 0.075:
 			results[ int(m), int(a)] = [ "RX PHASE FAIL MIN %5.3f < 0.075" % v]
@@ -331,15 +331,15 @@ def check_rx_phase(conn, sockets, ddir, acquire=True, fe_mode=False):
 		v = cmd_failed[(m,a)]['delta']
 		if (not fe_mode) and (v > 0.051):
 			results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.051" % v]
-                if fe_mode and (v > 0.060):
-                        results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.060" % v]
+		if fe_mode and (v > 0.060):
+			results[ int(m), int(a)] = [ "RX PHASE FAIL RANGE %5.3f > 0.060" % v]
 
 
 
 	return results
 	
 def check_multiple_links(conn, sockets):
-	print "CHECK MULTIPLE TX LINK MODES"
+	print("CHECK MULTIPLE TX LINK MODES")
 	results = {}
 	
 	for mode in [ 0x200, 0x100, 0x000 ]:
@@ -352,7 +352,7 @@ def check_multiple_links(conn, sockets):
 		conn.initializeSystem()
 		asicsConfig0 = conn.getAsicsConfig()
 		asicsConfig = deepcopy(asicsConfig0)
-		for ac in asicsConfig.values():
+		for ac in list(asicsConfig.values()):
 			ac.globalConfig.setValue("c_ext_tp_en", 1)
 			ac.channelConfig[15].setValue("c_tgr_main", 0b01)
 		conn.setAsicsConfig(asicsConfig)
@@ -371,7 +371,7 @@ def check_multiple_links(conn, sockets):
 				results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL EVT" % mode ]
 			
 			
-			if (0,0,2*m+a) not in asicsConfig.keys():
+			if (0,0,2*m+a) not in list(asicsConfig.keys()):
 				results[m,a] = [ "MULTILINK MODE 0x%04X CHECK FAIL CMD" % mode ]
 
 
@@ -380,7 +380,7 @@ def check_multiple_links(conn, sockets):
 	return results
 
 def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
-	print "CHECK DISCRIMINATORS"
+	print("CHECK DISCRIMINATORS")
 	if mode == "fast":
 		step = 3
 	else:
@@ -395,18 +395,18 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 		names=["port_id", "slave_id", "asic_id", "channel_id", 	"baseline_T", "baseline_E", "zero_T1", "zero_T2", "zero_E", "noise_T1", "noise_T2", "noise_E"]
 	)
 	
-        noisecriteria = {
+	noisecriteria = {
 		0:[2, 1, 0.6],
-                1:[1,0.5,0.3],
-                2:[0.67,0.33,0.3],
-                3:[0.5, 0.25, 0.3]
-        }
-        zerocriteria = {
+		1:[1,0.5,0.3],
+		2:[0.67,0.33,0.3],
+		3:[0.5, 0.25, 0.3]
+	}
+	zerocriteria = {
 		0:[100, 50, 16],
-                1:[50,25,8],
-                2:[33,17,5],
-                3:[25, 13, 4]
-        }
+		1:[50,25,8],
+		2:[33,17,5],
+		3:[25, 13, 4]
+	}
 	results = {}
 	for m,a,t in sockets:
 		results[m,a] = []
@@ -465,7 +465,7 @@ def check_discriminators(conn, sockets, disc_range, mode, ddir, acquire=True):
 	return results
 
 def check_tdc(conn, sockets, mode, ddir, acquire=True):
-	print "CHECK TDC"
+	print("CHECK TDC")
 	# WARNING:
 	# "mode" is not yet implemented, all acquisitions are done in full
 	
@@ -502,13 +502,13 @@ def check_tdc(conn, sockets, mode, ddir, acquire=True):
 							continue
 							
 						a0 = df2["a0"].iloc[0]
-                                                maxdac = 1.5 * a1 + a0
+						maxdac = 1.5 * a1 + a0
 						if maxdac > 1000:
 							results[m,a].append("TDC CH %d MAX DAC %5.0f > 1000" % (ch, maxdac))
 							continue
 						
 						a2 = df2["a2"].iloc[0]
-                                                # deltabin = 1.5 * a1 + a0
+						# deltabin = 1.5 * a1 + a0
 						# if maxdac > 1000:
 						# 	results[m,a].append("TDC CH %d MAX DAC %5.0f > 1000" % (ch, maxdac))
 						# 	continue
@@ -521,7 +521,7 @@ def check_tdc(conn, sockets, mode, ddir, acquire=True):
 	return results
 
 def check_qdc(conn, sockets, att, mode, ddir, acquire=True):
-	print "CHECK QDC"
+	print("CHECK QDC")
 	# WARNING
 	# "mode" is not implemented, all acquisitions are done in full
 	
@@ -580,11 +580,11 @@ def setup_xxtp(conn, sockets, att, disc_range, ddir, fetp):
 	
 	qdcTrim = config.readQDCTrimTable("%(ddir)s/qdc_calibration%(att)d.tsv" % locals())
 	# Fill qdcTrim table with a default value for missing channels
-	for ((p,s,a),ch) in itertools.product(asicsConfig.keys(), [x for x in range(32) ]):
-		if not qdcTrim.has_key((p,s,a,ch)):
+	for ((p,s,a),ch) in itertools.product(list(asicsConfig.keys()), [x for x in range(32) ]):
+		if (p,s,a,ch) not in qdcTrim:
 			qdcTrim[p,s,a,ch] = 24	
 	
-	for (p,s,a), ac in asicsConfig.items():
+	for (p,s,a), ac in list(asicsConfig.items()):
 
 		gc = ac.globalConfig
 		if fetp:
@@ -614,11 +614,11 @@ def setup_xxtp(conn, sockets, att, disc_range, ddir, fetp):
 	conn.setAsicsConfig(asicsConfig)
 	
 	_, disc_calibration = config.readDiscCalibrationsTable("%(ddir)s/disc_calibration%(disc_range)d.tsv" % locals())
-	disc_calibration = dict([ ((a, ch), zero_t1) for (p, s, a, ch), (zero_t1, zero_t2, zero_e) in disc_calibration.items() ])
+	disc_calibration = dict([ ((a, ch), zero_t1) for (p, s, a, ch), (zero_t1, zero_t2, zero_e) in list(disc_calibration.items()) ])
 	
 	# Fill disc calibration table with a default value for missing channels
-	for ((p,s,a),ch) in itertools.product(asicsConfig.keys(), [x for x in range(32) ]):
-		if not disc_calibration.has_key((p,s,a,ch)):
+	for ((p,s,a),ch) in itertools.product(list(asicsConfig.keys()), [x for x in range(32) ]):
+		if (p,s,a,ch) not in disc_calibration:
 			disc_calibration[p,s,a,ch] = 56.0
 
 	return disc_calibration
@@ -630,7 +630,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/fetp_tres_scan" % ddir
 	if acquire:
-			print "TESTING: FETP TRES"
+			print("TESTING: FETP TRES")
 			disc_calibration = setup_xxtp(conn, sockets, att, 1, ddir, True)
 		
 			asicsConfig0 = conn.getAsicsConfig()
@@ -648,7 +648,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 					asicsConfig = deepcopy(asicsConfig0)
 					ith_in_range = False
 					
-					for (p,s,a), ac in asicsConfig.items():
+					for (p,s,a), ac in list(asicsConfig.items()):
 						gc = ac.globalConfig
 						gc.setValue("Pulse_Amplitude", 31)
 				
@@ -667,7 +667,7 @@ def check_fetp_tres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 						# So we don't need to scan any further
 						break
 					
-					print "FETP TRMS ", ch, ith
+					print("FETP TRMS ", ch, ith)
 					conn.setAsicsConfig(asicsConfig)
 					conn.acquire(0.1, ch, ith)
 						
@@ -714,7 +714,7 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/fetp_eres_scan" % ddir
 	if acquire:
-			print "TESTING: FETP ERES"
+			print("TESTING: FETP ERES")
 			disc_calibration = setup_xxtp(conn, sockets, att, 2, ddir, True)
 		
 			asicsConfig0 = conn.getAsicsConfig()
@@ -730,7 +730,7 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 				for amp in range(1,32,4):
 					asicsConfig = deepcopy(asicsConfig0)
 					
-					for (p,s,a), ac in asicsConfig.items():
+					for (p,s,a), ac in list(asicsConfig.items()):
 						gc = ac.globalConfig
 						gc.setValue("Pulse_Amplitude", amp)
 				
@@ -739,7 +739,7 @@ def check_fetp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 						cc.setValue("cfg_a1_fetp_en", 1)
 						cc.setValue("c_tgr_main", 0b00)
 
-					print "FETP ERMS ", ch, amp
+					print("FETP ERMS ", ch, amp)
 					conn.setAsicsConfig(asicsConfig)
 					conn.acquire(0.1, ch, amp)
 						
@@ -783,7 +783,7 @@ def check_extp_tres(conn, sockets, att, ddir, fe_mode=False, acquire=True):
 
 	fName = "%s/extp_tres_scan" % ddir
 	if acquire:
-			print "TESTING: EXTP TRES"
+			print("TESTING: EXTP TRES")
 			disc_calibration = setup_xxtp(conn, sockets, att, 1, ddir, False)
 		
 			asicsConfig0 = conn.getAsicsConfig()
@@ -799,7 +799,7 @@ def check_extp_tres(conn, sockets, att, ddir, fe_mode=False, acquire=True):
 					asicsConfig = deepcopy(asicsConfig0)
 					ith_in_range = False
 					
-					for (p,s,a), ac in asicsConfig.items():
+					for (p,s,a), ac in list(asicsConfig.items()):
 						cc = ac.channelConfig[ch]
 						
 						new_ith = int(disc_calibration[a,ch] + ith)
@@ -814,7 +814,7 @@ def check_extp_tres(conn, sockets, att, ddir, fe_mode=False, acquire=True):
 						# So we don't need to scan any further
 						break
 					
-					print "EXTP TRMS ", ch, ith
+					print("EXTP TRMS ", ch, ith)
 					conn.setAsicsConfig(asicsConfig)
 					conn.acquire(0.1, ch, ith)
 						
@@ -849,7 +849,7 @@ def check_extp_tres(conn, sockets, att, ddir, fe_mode=False, acquire=True):
 					results[m,a].append("EXTP CH %d TRMS %4.1f > 50 ps" % (ch, trms))
 					continue
 
-                                if fe_mode and (trms > 150):
+				if fe_mode and (trms > 150):
 					results[m,a].append("EXTP CH %d TRMS %4.1f > 150 ps" % (ch, trms))
 					continue
 				
@@ -863,7 +863,7 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 
 	fName = "%s/extp_eres_scan" % ddir
 	if acquire:
-			print "TESTING: EXTP ERES"
+			print("TESTING: EXTP ERES")
 			disc_calibration = setup_xxtp(conn, sockets, att, 2, ddir, False)
 		
 			asicsConfig0 = conn.getAsicsConfig()
@@ -878,12 +878,12 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 					
 					asicsConfig = deepcopy(asicsConfig0)
 					
-					for (p,s,a), ac in asicsConfig.items():
+					for (p,s,a), ac in list(asicsConfig.items()):
 						cc = ac.channelConfig[ch]
 						cc.setValue("cfg_a3_ith_t1", disc_calibration[a,ch] + 10)
 						cc.setValue("c_tgr_main", 0b00)
 
-					print "EXTP ERMS ", ch, amp
+					print("EXTP ERMS ", ch, amp)
 					conn.setAsicsConfig(asicsConfig)
 					conn.acquire(0.1, ch, amp)
 						
@@ -895,10 +895,10 @@ def check_extp_eres(conn, sockets, att, ddir, acquire=True, fe_mode=False):
 				t.injector_disable()
 	
 	os.system("./convert_raw_to_singles --config %(ddir)s/config.ini -i %(fName)s -o %(fName)s --writeBinary --att %(att)d" % locals())
-        if fe_mode:
-	        os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\",172e3,250e3,true\\)""" % locals())
-        else:
-	        os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\"\\)""" % locals())
+	if fe_mode:
+		os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\",172e3,250e3,true\\)""" % locals())
+	else:
+		os.system("""root -b -l -q plot_fetp_energy.cc+\\(\\"%(fName)s\\"\\)""" % locals())
 	
 	df = pd.read_csv("%(fName)s.tsv" % locals(), sep="\t", header=None, names=["asic_id", "channel_id", "b", "m"])
 	
@@ -936,7 +936,7 @@ def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
 		results[m,a] = []
 
 	if acquire:
-		print "TESTING: ALDO"
+		print("TESTING: ALDO")
 		asicsConfig0 = conn.getAsicsConfig()
 		
 		f = open("%s/aldo.tsv" % ddir, "w")
@@ -947,7 +947,7 @@ def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
 				sys.stdout.flush()
 				
 				asicsConfig = deepcopy(asicsConfig0)
-				for ac in asicsConfig.values():
+				for ac in list(asicsConfig.values()):
 					gc = ac.globalConfig
 					if aldo_range == 0:
 						gc.setValue("Valdo_A_Gain", 0)
@@ -1014,7 +1014,7 @@ def check_aldo(conn, sockets, step, gain, ddir, acquire=True, fe_mode=False):
 						inl_limits = (0, 8)
 				else:
 					# Wide values to avoid failures
-                                        gain = (220 + 5.11)/5.11
+					gain = (220 + 5.11)/5.11
 					if aldo_range == 0:
 						slope_limits = (gain * 0.000445, gain * 0.000485)
 						b_limits = (34, gain*0.86)
@@ -1044,7 +1044,7 @@ def check_pt1000(conn, testers, ddir, acquire=True):
 
 	results = {}
 	if acquire:
-		print "CHECK PT1000 PATH"
+		print("CHECK PT1000 PATH")
 		f = open("%(ddir)s/pt1000.tsv" % locals(), "w")
 		for m, t in testers:
 			r_list = t.get_pt1000_resistance()
@@ -1062,8 +1062,8 @@ def check_pt1000(conn, testers, ddir, acquire=True):
 		results[m] = []
 		for path in [0, 1]:
 			r = df[m, path]["r"]
-                        if r < 2.25:
-                                results[m].append("PT1000 PATH %d HAS LOW RESISTANCE %f" % (path, r))
+			if r < 2.25:
+				results[m].append("PT1000 PATH %d HAS LOW RESISTANCE %f" % (path, r))
                                 
 			if r > 3.75:
 				results[m].append("PT1000 PATH %d HAS HIGH RESISTANCE %f" % (path, r))
@@ -1074,7 +1074,7 @@ def check_pt1000(conn, testers, ddir, acquire=True):
 def check_tec(conn, testers, ddir, acquire=True):
 	results = {}
 	if acquire:
-		print "CHECK TEC PATH"
+		print("CHECK TEC PATH")
 		f = open("%(ddir)s/tec.tsv" %locals(), "w")
 		conn.set_tec_power(True)
 		time.sleep(0.1)
@@ -1093,8 +1093,8 @@ def check_tec(conn, testers, ddir, acquire=True):
 	for m, t in testers:
 		results[m] = []
 		r = df[m]["r"]
-                if r < 1.1:
-                        results[m].append("TAC PATH HAS LOW RESISTANCE %f" % r)
+		if r < 1.1:
+			results[m].append("TAC PATH HAS LOW RESISTANCE %f" % r)
                         
 		if r > 1.5:
 			results[m].append("TAC PATH HAS HIGH RESISTANCE %f" % r)
@@ -1116,7 +1116,7 @@ def check_aldo_unloaded(conn, testers, ddir, acquire=True):
 		asicsConfig0 = conn.getAsicsConfig()
 		for aldo_dac in range(0, 1, 7):
 			asicsConfig = deepcopy(asicsConfig0)
-			for ac in asicsConfig.values():
+			for ac in list(asicsConfig.values()):
 				gc = ac.globalConfig
 				gc.setValue("Valdo_A_Gain", 1)
 				gc.setValue("Valdo_B_Gain", 1)
@@ -1153,7 +1153,7 @@ def check_aldo_unloaded(conn, testers, ddir, acquire=True):
 	return results
 
 def check_fe_bias_sanity(conn, testers, gain, ddir):
-	print "ALDO SANITY CHECKS"
+	print("ALDO SANITY CHECKS")
 	results = {}
 	for m, t in testers:
 		results[m] = []
@@ -1163,7 +1163,7 @@ def check_fe_bias_sanity(conn, testers, gain, ddir):
 	asicsConfig0 = conn.getAsicsConfig()
 	for aldo_dac in [0, 255]:
 		asicsConfig = deepcopy(asicsConfig0)
-		for ac in asicsConfig.values():
+		for ac in list(asicsConfig.values()):
 			gc = ac.globalConfig
 			gc.setValue("Valdo_A_Gain", 1)
 			gc.setValue("Valdo_B_Gain", 1)
@@ -1195,7 +1195,7 @@ def check_fe_bias_sanity(conn, testers, gain, ddir):
 	for m, t in testers:
 		for asic_id in [0, 1]:
 			for aldo_id in [0, 1]:
-				for ac in asicsConfig.values():
+				for ac in list(asicsConfig.values()):
 					gc = ac.globalConfig
 					gc.setValue("Valdo_A_Gain", 1)
 					gc.setValue("Valdo_B_Gain", 1)

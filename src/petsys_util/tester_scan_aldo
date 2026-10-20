@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import tester_controller, config, spi
@@ -11,14 +11,14 @@ import sys
 
 def do_scan(conn, asicsConfig0, step, aldo_range, load, output_file):
 	testers = conn.get_testers()
-	for tester in testers.values():
+	for tester in list(testers.values()):
 		tester.enable_bias_voltage_load(load)
 
 
 
 	# Enable and configure ALDO modes before scanning DAC
 	asicsConfig1 = deepcopy(asicsConfig0)
-	for ac in asicsConfig1.values():
+	for ac in list(asicsConfig1.values()):
 		gc = ac.globalConfig
 		gc.setValue("c_aldo_en", 0b11)
 
@@ -36,7 +36,7 @@ def do_scan(conn, asicsConfig0, step, aldo_range, load, output_file):
 
 
 	for aldo_dac in range(0, 256, step):
-		for (p, s, a), ac in asicsConfig1.items():
+		for (p, s, a), ac in list(asicsConfig1.items()):
 			gc = ac.globalConfig
 
 			for aldo_output in ["A", "B"]:
@@ -63,7 +63,7 @@ def do_scan(conn, asicsConfig0, step, aldo_range, load, output_file):
 				failures = tester.check_bias_voltage(asic, aldo_output, v)
 
 				if failures != []:
-					print "ALDO failure check at (%2d %2d %d %d) OUT %s"  % (p, s, m, asic, aldo_output), failures
+					print("ALDO failure check at (%2d %2d %d %d) OUT %s"  % (p, s, m, asic, aldo_output), failures)
 					exit(1)
 
 

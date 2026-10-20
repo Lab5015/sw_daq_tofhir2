@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 import sys
@@ -102,7 +102,7 @@ def ltc_read_channels(conn, channelList=None):
 			result[(chip, channel)] = temperature
 		else:
 			status_msg = "ERR"
-		print "CHIP %d CH %02d STATUS %03s (0x%02X) TEMP %10.3f ºC" % (chip, channel, status_msg, status, temperature)
+		print("CHIP %d CH %02d STATUS %03s (0x%02X) TEMP %10.3f ºC" % (chip, channel, status_msg, status, temperature))
 
 	return result
 		

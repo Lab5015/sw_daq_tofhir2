@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import tester_controller, config, spi, tofhir2b, tests
@@ -49,14 +49,14 @@ def main(argv):
 	conn.set_uut_power(False)
 
 	# Check that we have all expected testers
-	n_testers = len(conn.get_testers().keys())
+	n_testers = len(list(conn.get_testers().keys()))
 	if n_testers != args.n:
 		sys.stderr.write("Expected %d testers, found %d\n" % (args.n, n_testers))
 		exit(1)
 
 
 	uut_failures = {}
-	all_sockets = itertools.product(conn.get_testers().items(), [0, 1])
+	all_sockets = itertools.product(list(conn.get_testers().items()), [0, 1])
 	all_sockets = [ (m,a,t) for ((p, s, m), t), a in all_sockets ]
 	all_sockets = sorted(all_sockets)
 	
@@ -139,15 +139,15 @@ def main(argv):
 	extp_amp_list = [ 0xFFFF ]
 	fetp_amp_list = [ v for v in range(3, 32, 4) ]
 	
-	assert xxtp_att in qdc_att_list.keys()
+	assert xxtp_att in list(qdc_att_list.keys())
 
 	
-	for disc_range, mode in disc_range_list.items():
+	for disc_range, mode in list(disc_range_list.items()):
 		uut_failures = merge_failures(uut_failures, tests.check_discriminators(conn, sockets, disc_range, mode, args.o))
 		
 	uut_failures = merge_failures(uut_failures, tests.check_tdc(conn, sockets, "full", args.o))
 	
-	for att, mode in qdc_att_list.items():
+	for att, mode in list(qdc_att_list.items()):
 		uut_failures = merge_failures(uut_failures, tests.check_qdc(conn, sockets, att, mode, args.o))
 		
 	uut_failures = merge_failures(uut_failures, tests.check_fetp_tres(conn, sockets, xxtp_att, args.o))
@@ -163,7 +163,7 @@ def main(argv):
 	results_file = open("%s/results.tsv" % args.o, "w")
 	detailed_results_file = open("%s/detailed_results.tsv" % args.o, "w")
 	
-	for (m, a), failures in uut_failures.items():
+	for (m, a), failures in list(uut_failures.items()):
 		detailed_results_file.write("%d\t%d\t%s\n" % (m, a, ("\t").join(failures)))
 
 		if failures == []:
@@ -177,8 +177,8 @@ def main(argv):
 	results_file.close()
 	
 
-	print sockets
-	print uut_failures
+	print(sockets)
+	print(uut_failures)
 	
 	# Test sucessfully complete
 	conn.set_uut_power(False)
@@ -189,11 +189,11 @@ def main(argv):
 			if uut_failures[m,a] != []:
 				t.set_leds(a, 0b001)
       
-		print """> TRANSFER CHIPS FROM SOCKETS TO "FAILED TRAY/BOX"""
-		print """> SOCKETS INDICATED BY RED LEDs"""
-		print """> PRESS ENTER WHEN DONE"""
+		print("""> TRANSFER CHIPS FROM SOCKETS TO "FAILED TRAY/BOX""")
+		print("""> SOCKETS INDICATED BY RED LEDs""")
+		print("""> PRESS ENTER WHEN DONE""")
 		termios.tcflush(sys.stdin, termios.TCIFLUSH)
-		raw_input()
+		input()
 		
 
 		for m, a, t in all_sockets:
@@ -201,11 +201,11 @@ def main(argv):
 			if uut_failures[m,a] == []:
 				t.set_leds(a, 0b010)
       
-		print """> TRANSFER CHIPS FROM SOCKETS TO "OK TRAY/BOX"""
-		print """> SOCKETS INDICATED BY GREEN LEDs"""
-		print """> PRESS ENTER WHEN DONE"""
+		print("""> TRANSFER CHIPS FROM SOCKETS TO "OK TRAY/BOX""")
+		print("""> SOCKETS INDICATED BY GREEN LEDs""")
+		print("""> PRESS ENTER WHEN DONE""")
 		termios.tcflush(sys.stdin, termios.TCIFLUSH)
-		raw_input()
+		input()
 		
 		# Disable indicator LEDs
 		for m, a, t in all_sockets:
@@ -216,8 +216,8 @@ def main(argv):
 		# When called by test_bga_auto 
 		# instead of actually running a test just wait for user input
 		# and return
-		print "*** PRESS ENTER TO CONTINUE ***"
-		a = raw_input()
+		print("*** PRESS ENTER TO CONTINUE ***")
+		a = input()
 
 		
 	return 0
@@ -229,12 +229,12 @@ def merge_failures(a, b):
 	# Sanity check
 	# If we have a fail report for a previously unknown ASIC
 	# it's most likely a bug in the code
-	for k in b.keys():
-		assert k in a.keys()
+	for k in list(b.keys()):
+		assert k in list(a.keys())
 		
-	for k in a.keys():
+	for k in list(a.keys()):
 		c[k] = a[k]
-		if b.has_key(k):
+		if k in b:
 			a[k] += b[k]
 	
 	return c
@@ -249,7 +249,7 @@ def disable_failed(sockets, uut_failures):
 
 	result = [ (m,a,t) for m,a,t in sockets if t.get_uut_on(a) ]
 	time.sleep(0.1)
-	print "Still active sockets: ", [ (m, a) for m,a,t in result ]
+	print("Still active sockets: ", [ (m, a) for m,a,t in result ])
 	return result
 
 
@@ -259,11 +259,11 @@ def do_tester_check(conn):
 		tester_vin = t.get_tester_vin()
 		
 		if tester_vin < 1.6:
-			print "Tester %d Vin %3.2f is LOW" % (m, tester_vin)
+			print("Tester %d Vin %3.2f is LOW" % (m, tester_vin))
 			problems = True
 			
 		if tester_vin > 2.5:			
-			print "Tester %d Vin %3.2f is HIGH" % (m, tester_vin)
+			print("Tester %d Vin %3.2f is HIGH" % (m, tester_vin))
 			problems = True
 			
 			
@@ -274,16 +274,16 @@ def do_tester_check(conn):
 			uut_vin = t.get_uut_vin(a)
 			
 			if uut_vin < (1.2 * 0.98):
-				print "Tester %d UUT %d Vin %3.2f is LOW" % (m, a, uut_vin)
+				print("Tester %d UUT %d Vin %3.2f is LOW" % (m, a, uut_vin))
 				problems = True
 				
 			if uut_vin > (1.2 * 1.02):
-				print "Tester %d UUT %d Vin %3.2f is HIGH" % (m, a, uut_vin)
+				print("Tester %d UUT %d Vin %3.2f is HIGH" % (m, a, uut_vin))
 				problems = True
 	
 	
 	if problems:
-		print "PROBLEMS FOUND IN TEST SYSTEM"
+		print("PROBLEMS FOUND IN TEST SYSTEM")
 		exit(1)
 	
 	

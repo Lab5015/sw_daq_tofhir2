@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import ConfigParser
+import configparser
 import os.path
 import re
 from sys import stderr
 from string import upper
-import tofhir2
+from . import tofhir2
 import bitarray
 import math
 
@@ -34,7 +34,7 @@ def ConfigFromFile(configFileName, loadMask=LOAD_ALL):
 	cdir = os.path.dirname(configFileName)
 
 	config = Config()
-	configParser = ConfigParser.RawConfigParser()
+	configParser = configparser.RawConfigParser()
 	configParser.read(configFileName)
 	
 	if (loadMask & LOAD_BIAS_CALIBRATION) != 0:
@@ -73,19 +73,19 @@ def ConfigFromFile(configFileName, loadMask=LOAD_ALL):
 		config._Config__asicChannelThresholdSettingsTable = t
 		config._Config__loadMask |= LOAD_DISC_SETTINGS
 
-        if (loadMask & LOAD_QDCMODE_MAP) != 0:
-                fn = configParser.get("main", "acquisition_mode_table")
+	if (loadMask & LOAD_QDCMODE_MAP) != 0:
+		fn = configParser.get("main", "acquisition_mode_table")
 		fn = replace_variables(fn, cdir)
 		t = readQDCModeTable(fn)
 		config._Config__asicChannelQDCModeTable = t
 		config._Config__loadMask |= LOAD_QDCMODE_MAP
         
-        if (loadMask & LOAD_ALDO_CALIBRATION) != 0:
-                fn = configParser.get("main", "aldo_A_calibration")
+	if (loadMask & LOAD_ALDO_CALIBRATION) != 0:
+		fn = configParser.get("main", "aldo_A_calibration")
 		fn = replace_variables(fn, cdir)
 		t = readALDOCalibration(fn)
 		config._Config__ALDOACalibrationTable = t
-                fn = configParser.get("main", "aldo_B_calibration")
+		fn = configParser.get("main", "aldo_B_calibration")
 		fn = replace_variables(fn, cdir)
 		t = readALDOCalibration(fn)
 		config._Config__ALDOBCalibrationTable = t
@@ -130,7 +130,7 @@ class Config:
 		self.__asicChannelBaselineSettingsTable = {}
 		self.__asicChannelThresholdCalibrationTable = {}
 		self.__asicChannelThresholdSettingsTable = {}
-                self.__asicChannelQDCModeTable = {}
+		self.__asicChannelQDCModeTable = {}
 		self.__asicParameterTable = {}
 		self.__biasChannelSettingsTableAldo = {}
 		self.__ALDOACalibrationTable = {}
@@ -139,8 +139,8 @@ class Config:
 		self.__hw_trigger = None
 	def applyConfigToAsics(self, asicsConfig):
 		# Apply ASIC parameters from file
-		for (gc, key), value in self.__asicParameterTable.items():
-			for ac in asicsConfig.values():
+		for (gc, key), value in list(self.__asicParameterTable.items()):
+			for ac in list(asicsConfig.values()):
 				if gc == "global":
 					ac.globalConfig.setValue(key, value)
 				else:
@@ -153,14 +153,14 @@ class Config:
 		# 
 		hvdacHwConfig = daqd.get_hvdac_config()
 		# Set all bias channels ~1V (off, but avoid from from amplifier to SiPM)
-		for key in hvdacHwConfig.keys():
+		for key in list(hvdacHwConfig.keys()):
 			# Set HVDAC to ~1 V, to avoid flow back from amplifier through SiPM
 				hvdacHwConfig[key] = int(round(1.0 * 2**14 / (50 * 2.048)))
 
 		if bias_enable == APPLY_BIAS_PREBD or bias_enable == APPLY_BIAS_ON:
 			assert (self.__loadMask & LOAD_BIAS_CALIBRATION) != 0
 			assert (self.__loadMask & LOAD_BIAS_SETTINGS) != 0
-			for key in self.__biasChannelSettingsTable.keys():
+			for key in list(self.__biasChannelSettingsTable.keys()):
 				offset, prebd, bd, over = self.getBiasChannelDefaultSettings(key)
 				if bias_enable == APPLY_BIAS_PREBD:
 					Vset = offset + prebd
@@ -176,8 +176,8 @@ class Config:
 		asicsConfig = daqd.getAsicsConfig()
 
 		# Apply ASIC parameters from file
-		for (gc, key), value in self.__asicParameterTable.items():
-			for ac in asicsConfig.values():
+		for (gc, key), value in list(self.__asicParameterTable.items()):
+			for ac in list(asicsConfig.values()):
 				if gc == "global":
 					ac.globalConfig.setValue(key, value)
 				else:
@@ -186,7 +186,7 @@ class Config:
 
 		# Apply discriminator baseline calibrations
 		if (self.__loadMask & LOAD_DISC_CALIBRATION) != 0:
-			for portID, slaveID, chipID in asicsConfig.keys():
+			for portID, slaveID, chipID in list(asicsConfig.keys()):
 				pass
 				
 		#if (self.__loadMask & LOAD_DISC_SETTINGS) != 0:
@@ -207,7 +207,7 @@ class Config:
 
 
 		if (self.__loadMask & LOAD_QDC_CALIBRATION) != 0:
-			for portID, slaveID, chipID in asicsConfig.keys():
+			for portID, slaveID, chipID in list(asicsConfig.keys()):
 				ac = asicsConfig[(portID, slaveID, chipID)]
 				for channelID, cc in enumerate(ac.channelConfig):
 					try:
@@ -255,7 +255,7 @@ class Config:
 		return None
 	
 	def getCalibratedBiasChannels(self):
-		return self.__biasChannelCalibrationTable.keys()
+		return list(self.__biasChannelCalibrationTable.keys())
 	
 	def getBiasChannelDefaultSettings(self, key):
 		return self.__biasChannelSettingsTable[key]
@@ -279,7 +279,7 @@ class Config:
 		return int(round(x))
 		
 	def getCalibratedDiscChannels(self):
-		return self.__asicChannelBaselineSettingsTable.keys()
+		return list(self.__asicChannelBaselineSettingsTable.keys())
 	
 	def getAsicChannelDefaultBaselineSettings(self, key):
 		return self.__asicChannelBaselineSettingsTable[key]
@@ -288,37 +288,39 @@ class Config:
 		return self.__asicChannelThresholdSettingsTable[key]
         
 	def getAsicChannelQDCMode(self, key):
-                return self.__asicChannelQDCModeTable[key]
+		return self.__asicChannelQDCModeTable[key]
 			
 	def mapAsicChannelThresholdToDAC(self, key, vth_str, value, disc_range=-1):
 		vth_t1, vth_t2, vth_e = self.__asicChannelThresholdCalibrationTable[key]
 		tmp = { "vth_t1" : vth_t1, "vth_t2" : vth_t2, "vth_e" : vth_e }
-                def_range = { "vth_t1" : 1, "vth_t2" : 0, "vth_e" : 0 }
-                if disc_range > -1:
-                        return int( tmp[vth_str]*(def_range[vth_str]+1)/(disc_range+1) + value)
+		def_range = { "vth_t1" : 1, "vth_t2" : 0, "vth_e" : 0 }
+		if disc_range > -1:
+			return int( tmp[vth_str]*(def_range[vth_str]+1)/(disc_range+1) + value)
 		return int( tmp[vth_str] + value)
                 
-        def mapALDOVoltageToDAC(self, (portID, slaveID, chipID, aldoID), bd, ov):
-                ret = -1
-                best = 9999.
-                table = {}
-                if aldoID is 'A':
-                        table = self.__ALDOACalibrationTable[(portID, slaveID, chipID)]
-                if aldoID is 'B':
-                        table = self.__ALDOBCalibrationTable[(portID, slaveID, chipID)]
+	def mapALDOVoltageToDAC(self, xxx_todo_changeme, bd, ov):
+		(portID, slaveID, chipID, aldoID) = xxx_todo_changeme
+		ret = -1
+		best = 9999.
+		table = {}
+		if aldoID is 'A':
+			table = self.__ALDOACalibrationTable[(portID, slaveID, chipID)]
+		if aldoID is 'B':
+			table = self.__ALDOBCalibrationTable[(portID, slaveID, chipID)]
                 
-                for key in table:
-                        val = table[key]
-                        if abs( float(val) - (float(bd)+float(ov)) ) < best:
-                                ret = key
-                                best = abs( float(val) - (float(bd)+float(ov)) )
-                print("ALDO %s on ASIC%d:   DAC: %d   V: %f") %(aldoID,chipID,int(ret),float(table[ret]))
-                return ret
+		for key in table:
+			val = table[key]
+			if abs( float(val) - (float(bd)+float(ov)) ) < best:
+				ret = key
+				best = abs( float(val) - (float(bd)+float(ov)) )
+		print(("ALDO %s on ASIC%d:   DAC: %d   V: %f") %(aldoID,chipID,int(ret),float(table[ret])))
+		return ret
 
-        def mapALDODACToVoltage(self, (portID, slaveID, chipID), dac):
-                retA = float(self.__ALDOACalibrationTable[(portID, slaveID, chipID)][dac])
-                retB = float(self.__ALDOBCalibrationTable[(portID, slaveID, chipID)][dac])
-                return retA, retB
+	def mapALDODACToVoltage(self, xxx_todo_changeme1, dac):
+		(portID, slaveID, chipID) = xxx_todo_changeme1
+		retA = float(self.__ALDOACalibrationTable[(portID, slaveID, chipID)][dac])
+		retB = float(self.__ALDOBCalibrationTable[(portID, slaveID, chipID)][dac])
+		return retA, retB
 
 def toInt(s):
 	s = s.upper()
@@ -342,7 +344,7 @@ def parseAsicParameters(configParser):
 			k = key[8:]
 			t[("channel", k)] = toInt(value)
 		else:
-			print "Invalid ASIC parameter: '%s'" % key
+			print("Invalid ASIC parameter: '%s'" % key)
 			exit(1)
 	return t
 
@@ -365,7 +367,7 @@ def readBiasCalibrationTable_tripplet_list(fn):
 		if l == ['']: continue
 		portID, slaveID, channelID = [ int(v) for v in l[0:3] ]
 		key = (portID, slaveID, channelID)
-		if not c.has_key(key):
+		if key not in c:
 			c[key] = []
 		dac_set = int(l[3])
 		v_meas = float(l[4])
@@ -411,8 +413,8 @@ def readSiPMBiasTableAldo(fn):
 	for l in f:
 		l = normalizeAndSplit(l)
 		if l == ['']: continue
-                portID, slaveID, chipID, aldoID = [ int(l[0]), int(l[1]), int(l[2]), l[3] ]
-                c[(portID, slaveID, chipID, aldoID)] = [ float(v) for v in l[4:6] ]
+		portID, slaveID, chipID, aldoID = [ int(l[0]), int(l[1]), int(l[2]), l[3] ]
+		c[(portID, slaveID, chipID, aldoID)] = [ float(v) for v in l[4:6] ]
 	f.close()
 	return c
 
@@ -443,15 +445,15 @@ def readDiscSettingsTable(fn):
 def readQDCModeTable(fn):
 	f = open(fn)
 	c = {}
-        ln = 0
+	ln = 0
 	for l in f:
-                ln += 1
+		ln += 1
 		l = normalizeAndSplit(l)
 		if l == ['']: continue
 		portID, slaveID, chipID, channelID = [ int(v) for v in l[0:4] ]
 		c[(portID, slaveID, chipID, channelID)] =  l[4:5][0]
-                if c[(portID, slaveID, chipID, channelID)] not in ['tot', 'qdc']:
-			print "Error in '%s' line %d: mode must be 'qdc' or 'tot'\n" % (fn, ln)
+		if c[(portID, slaveID, chipID, channelID)] not in ['tot', 'qdc']:
+			print("Error in '%s' line %d: mode must be 'qdc' or 'tot'\n" % (fn, ln))
 			exit(1)
 	f.close()
 	return c
@@ -463,7 +465,7 @@ def readQDCTrimTable(fn):
 		l = normalizeAndSplit(l)
 		if l == ['']: continue
 		portID, slaveID, chipID, channelID, tacID, trim = [ int(v) for v in l[0:6] ]
-		if not c.has_key((portID, slaveID, chipID, channelID)):
+		if (portID, slaveID, chipID, channelID) not in c:
 			c[(portID, slaveID, chipID, channelID)] = {}
 		c[(portID, slaveID, chipID, channelID)] =  trim
 	f.close()
@@ -477,9 +479,9 @@ def readALDOCalibration(fn):
 		l = normalizeAndSplit(l)
 		if l == ['']: continue
 		portID, slaveID, chipID = [ int(v) for v in l[0:3] ]
-                if not (portID,slaveID,chipID) in c:
-                        c[(portID,slaveID,chipID)]= {}
-                c[(portID,slaveID,chipID)][int(l[3])] = l[4]
+		if not (portID,slaveID,chipID) in c:
+			c[(portID,slaveID,chipID)]= {}
+		c[(portID,slaveID,chipID)][int(l[3])] = l[4]
 	f.close()
 	return c
 
@@ -496,7 +498,7 @@ def readTriggerMap(fn):
 		r2 = int(l[1])
 		c = upper(l[2])
 		if c not in ['M', 'C']:
-			print "Error in '%s' line %d: type must be 'M' or 'C'\n" % (fn, ln)
+			print("Error in '%s' line %d: type must be 'M' or 'C'\n" % (fn, ln))
 			exit(1)
 
 		if c == 'C':
@@ -506,13 +508,13 @@ def readTriggerMap(fn):
 
 
 def readTopologyMap(fn):
-        f = open(fn)
+	f = open(fn)
 	c = {}
 	for l in f:
 		l = normalizeAndSplit(l)
 		if l == ['']: continue
 		portID, slaveID, chipID = [ int(v) for v in l[0:3] ]
-                c[(portID, slaveID, chipID)] = [ v for v in l[3:4] ]
+		c[(portID, slaveID, chipID)] = [ v for v in l[3:4] ]
         
-        f.close()
+	f.close()
 	return c

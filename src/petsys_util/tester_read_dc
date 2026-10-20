@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import tester_controller, config, spi, bga_tester, fe_tester
@@ -30,7 +30,7 @@ def main():
 	conn.initializeSystem()
 
 	asicsConfig = conn.getAsicsConfig()
-	for ac in asicsConfig.values():
+	for ac in list(asicsConfig.values()):
 		gc = ac.globalConfig
 		gc.setValue("c_aldo_en", 0b11)
 		gc.setValue("c_aldo_range", 0b00) # Range for ALDO HV current measurement
@@ -48,10 +48,10 @@ def main():
 	tt = [ tester for (p,s,m), tester in sorted(conn.get_testers().items()) ]
 	tester_type = set([ type(t) for t in tt ])
 	if len(tester_type) == 0:
-		print "No testers found!"
+		print("No testers found!")
 		exit(0)
 	elif len(tester_type) > 1:
-		print "Multiple types of testers present!"
+		print("Multiple types of testers present!")
 		exit(1)
 
 	if args.o is not None:
