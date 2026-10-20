@@ -1,10 +1,20 @@
-cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 project(sw_daq_tofpet2)
-find_package(PythonLibs 2.6 REQUIRED)
-find_package(Boost REQUIRED python regex)
+# Use Boost's own BoostConfig.cmake (FindBoost was removed in CMake 3.30)
+if(POLICY CMP0167)
+	cmake_policy(SET CMP0167 NEW)
+endif()
+# Prefer the system "python3" (3.9 on AlmaLinux 9), which boost-python3 and
+# python3-root are built against, over other installed versions (e.g. 3.11).
+# Override with -DPython3_EXECUTABLE=/path/to/python
+if(NOT Python3_EXECUTABLE)
+	find_program(Python3_EXECUTABLE NAMES python3 NO_CACHE)
+endif()
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+find_package(Boost REQUIRED COMPONENTS python${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR} regex)
 include(CheckIncludeFiles)
 
-include_directories(${Boost_INCLUDE_DIRS} ${PYTHON_INCLUDE_DIRS})
+include_directories(${Boost_INCLUDE_DIRS} ${Python3_INCLUDE_DIRS})
 link_libraries("rt" "pthread")
 
 include_directories("src/raw_data")
@@ -30,9 +40,11 @@ string(STRIP ${ROOT_LIBS} ROOT_LIBS)
 execute_process(COMMAND root-config --cflags OUTPUT_VARIABLE ROOT_CXX_FLAGS)
 string(STRIP ${ROOT_CXX_FLAGS} ROOT_CXX_FLAGS)
 
-link_libraries(${Boost_LIBRARIES} ${PYTHON_LIBRARIES} "-liniparser")
+link_libraries(${Boost_LIBRARIES} ${Python3_LIBRARIES} "-liniparser")
 add_library(shm_raw_py MODULE "src/raw_data/shm_raw.cpp" "src/raw_data/shm_raw_py.cpp")
 set_target_properties(shm_raw_py PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/petsys OUTPUT_NAME shm_raw PREFIX "")
+# boost/python.hpp pulls in the deprecated boost/bind.hpp: keep the old placeholders and silence the note
+target_compile_definitions(shm_raw_py PRIVATE BOOST_BIND_GLOBAL_PLACEHOLDERS)
 
 configure_file("src/petsys_py_lib/__init__.py" "petsys/__init__.py" COPYONLY)
 configure_file("src/petsys_py_lib/tofhir2.py" "petsys/tofhir2.py" COPYONLY)

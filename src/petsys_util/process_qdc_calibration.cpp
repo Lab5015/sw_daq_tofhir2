@@ -24,6 +24,7 @@
 #include <boost/lexical_cast.hpp>
 
 #include <TF1.h>
+#include <Math/MinimizerOptions.h>
 #include <TH1S.h>
 #include <TH1D.h>
 #include <TH2S.h>
@@ -106,6 +107,10 @@ void displayUsage() {
 
 int main(int argc, char *argv[])
 {
+	// ROOT >= 6.32 defaults to Minuit2; the calibration fits were tuned with Minuit (ROOT 6.24 on CentOS 7)
+	// and Minuit2 converges to different minima. Requires the root-minuit package.
+	ROOT::Math::MinimizerOptions::SetDefaultMinimizer("Minuit");
+
 	float nominalM = 200;
 	char *configFileName = NULL;
 	char *inputFilePrefix = NULL;

@@ -1,3 +1,4 @@
+#include <iostream>
 #include <RawReader.hpp>
 #include <DAQv1Reader.hpp>
 #include <OverlappedEventHandler.hpp>
