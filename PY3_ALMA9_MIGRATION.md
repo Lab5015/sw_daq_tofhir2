@@ -4,7 +4,7 @@ This document summarizes the port of the TOFHiR2 DAQ software from Python 2 / Ce
 It also records what we learned about **FEB/D firmware versions and the software changes each one requires**.
 Read that part before upgrading the firmware.
 
-Last updated: 2026-10-19.
+Last updated: 2026-10-20.
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: 2026-10-19.
 | OS / Python | CentOS 7.9, Python 2.7.5 | AlmaLinux 9.7, Python 3.9 |
 | Software | `~/DAQ/sw_daq_tofhir2b`, commit `42011d0` + local changes | `tofhir2b-py3-alma9` (Python 3 port of the same version) |
 | FEB/D firmware | "old" firmware (`expect_reply = 0x01` protocol) | same firmware |
-| Status | works | **works**: `init_system`, also with `--config config/2C/...` |
+| Status | works | **works**: `init_system` (also with `--config config/2C/...`), TDC and QDC calibrations |
 
 **Two** versions of the software were ported to Python 3, because they require different firmware (see §2):
 
@@ -40,6 +40,7 @@ The library in `build/petsys/` was identical to `src/petsys_py_lib/`.
 `build/` on CentOS 7 also contains lab scripts that are not in git and were **not** imported:
 `scannone_launcher.py`, `scannone_converter.py`, `scannone_mapper.py`, `scannone_README.md`, `convert_TB.py`,
 `renameCalibs.py`, `convert_many.sh`, `acquire_tp_basic`, `acquire_sipm_data_scan_temp`, `lancia_*`, `drawIVMerged.py`.
+They are not needed (decided 2026-10-20) and stay Python 2 on the CentOS 7 machine only.
 
 **Rule for the future:** edit scripts in `src/`, then run `make` (it copies them into `build/`).
 
