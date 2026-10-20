@@ -6,3 +6,6 @@
 *.so
 *_C.d
 
+build/
+config/
+__pycache__/
