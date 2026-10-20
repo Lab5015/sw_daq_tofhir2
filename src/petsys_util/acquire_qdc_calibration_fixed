@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import daqd, config
@@ -25,16 +25,16 @@ nLengths = 1
 intg_time = {}
 
 asicsConfig = daqd.getAsicsConfig()
-for ac in asicsConfig.values():
+for ac in list(asicsConfig.values()):
 	
-        for channel in range(0, 32):
-                min = ac.channelConfig[channel].getValue("c_min_q")
-                max = ac.channelConfig[channel].getValue("c_max_q")
-                if( min != max ):
-                        print("error: min: %d   max: %d") %(int(min),int(max))
-                intg_time[channel] = min
+	for channel in range(0, 32):
+		min = ac.channelConfig[channel].getValue("c_min_q")
+		max = ac.channelConfig[channel].getValue("c_max_q")
+		if( min != max ):
+			print(("error: min: %d   max: %d") %(int(min),int(max)))
+		intg_time[channel] = min
         
-        ac.globalConfig.setValue("c_ext_tp_en", 1)
+	ac.globalConfig.setValue("c_ext_tp_en", 1)
 	for cc in ac.channelConfig:
 		# Disable channel from triggering.
 		# Will selectively enable channels below
@@ -80,16 +80,16 @@ for firstChannel in range(0, channelStep):
         
 	# Enable triggering for active channels
 	cfg = deepcopy(asicsConfig)
-	for ac in cfg.values():
+	for ac in list(cfg.values()):
 		for channel in activeChannels:
 			ac.channelConfig[channel].setValue("c_tgr_main", 0b01)
 	daqd.setAsicsConfig(cfg)
 
 	for phase in [float(x)/nPhases for x in range(nPhases)]:
-                t_start = time.time()
-                daqd.set_test_pulse_febds(intg_time[firstChannel], 1024, phase, False)
-                daqd.acquire(0.04, intg_time[firstChannel], phase)
-                t_finish = time.time()
-                print "Channel(s): %s Phase: %4.3f clk Length %d clk in %3.2f seconds " % (activeChannels_string, phase, intg_time[firstChannel], t_finish - t_start)
+		t_start = time.time()
+		daqd.set_test_pulse_febds(intg_time[firstChannel], 1024, phase, False)
+		daqd.acquire(0.04, intg_time[firstChannel], phase)
+		t_finish = time.time()
+		print("Channel(s): %s Phase: %4.3f clk Length %d clk in %3.2f seconds " % (activeChannels_string, phase, intg_time[firstChannel], t_finish - t_start))
 
 systemConfig.loadToHardware(daqd, bias_enable=config.APPLY_BIAS_OFF)

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import sys
 import os
 sys.path.insert(1, os.path.join(sys.path[0], '../build_new/'))
@@ -22,7 +22,7 @@ args = parser.parse_args()
 logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S', filename=args.filename, encoding='utf-8', level=logging.INFO)
 # connect and configure multimeter
 keithley = K2000('tcp://raspcmsroma01:8820')
-print("logging SiPM current from Keithley channel number %d "%(int(args.ch)))
+print(("logging SiPM current from Keithley channel number %d "%(int(args.ch))))
 keithley.selectChannel(int(args.ch))
 
 while(True):

@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/env python3
 
 ###---H4DAQ statuses
 H4DAQStatuses = {
@@ -25,7 +25,7 @@ import sys
 import datetime
 from copy import deepcopy
 import argparse
-import commands
+import subprocess
 import os
 import threading
 
@@ -90,9 +90,9 @@ class daqThread(threading.Thread):
 def logTemperatures():
     temps=my_tofhir.getTemperatures()
     tString='{'
-    for k,t in temps.iteritems():
+    for k,t in temps.items():
         tString+=' %d:%.3f'%(k,t)
-    print('%s }'%tString)
+    print(('%s }'%tString))
     tString+=' }\n'
     outFileTemperatures.write(tString)
     outFileTemperatures.flush()
@@ -106,7 +106,7 @@ args = parser.parse_args()
 
 import configparser
 config = configparser.ConfigParser()
-print("Reading config from %s"%args.config)
+print(("Reading config from %s"%args.config))
 config.read(args.config)
 daqConfig = config['H4DAQ']
 
@@ -128,13 +128,13 @@ if ('fixedConfig' in tofhirConfig):
 ovThSequence = config['TH_OV']    
 #redefine sequence
 mySequence={}
-for key,value in ovThSequence.iteritems():
+for key,value in ovThSequence.items():
     values=value.split(',')
     if (int(tofhirConfig['vth2_rel'])==1):
         mySequence[str(key)]={ 'vth1':str(values[0]),'vth2':str(int(values[0])+int(values[1])),'vthe':str(values[2]),'ov':str(values[3]),'ovDrop':str(values[4]) }
     else:
         mySequence[str(key)]={ 'vth1':str(values[0]),'vth2':str(values[1]),'vthe':str(values[2]),'ov':str(values[3]),'ovDrop':str(values[4]) }
-    print('Sequence ID %s:%s'%(str(key),mySequence[str(key)]))
+    print(('Sequence ID %s:%s'%(str(key),mySequence[str(key)])))
 sequence=sorted(ovThSequence.keys())
 sequenceCounter=0
 
@@ -146,22 +146,22 @@ if __name__ == "__main__":
     #---connect to other daemons ports
     sockets = {}
     sockets["GUI"] = context.socket(zmq.SUB)
-    print("Connecting GUI at %s"%daqConfig["GUI_port"])
+    print(("Connecting GUI at %s"%daqConfig["GUI_port"]))
     sockets["GUI"].connect(daqConfig["GUI_port"])
     sockets["GUI"].setsockopt(zmq.SUBSCRIBE, '')
     poller.register(sockets["GUI"], zmq.POLLIN)
     sockets["RC"] = context.socket(zmq.SUB)
-    print("Connecting RC at %s"%daqConfig["RC_port"])
+    print(("Connecting RC at %s"%daqConfig["RC_port"]))
     sockets["RC"].connect(daqConfig["RC_port"])
     sockets["RC"].setsockopt(zmq.SUBSCRIBE, '')
     poller.register(sockets["RC"], zmq.POLLIN)
     #---Public status_port
     status_port = context.socket(zmq.PUB)
-    print("Publishing STATUS at %s"%daqConfig["STATUS_port"])
+    print(("Publishing STATUS at %s"%daqConfig["STATUS_port"]))
     status_port.bind('tcp://*:%s' % daqConfig["STATUS_port"])    
     #---Public commandport
     cmd_port = context.socket(zmq.PUB)
-    print("Publishing CMD at %s"%daqConfig["CMD_port"])
+    print(("Publishing CMD at %s"%daqConfig["CMD_port"]))
     cmd_port.bind('tcp://*:%s' % daqConfig["CMD_port"])    
 
     
@@ -198,7 +198,7 @@ if __name__ == "__main__":
                 ###---reconfigure asic if GUI send new configuration
                 if "GUI_RECONFIG" in message:
                     sys.stderr.write(message+'\n')
-                    print("Reading config from %s"%args.config)
+                    print(("Reading config from %s"%args.config))
                     config.read(args.config)
                     daqConfig = config['H4DAQ']
                     tofhirConfig = config['TOFHIR']
@@ -206,10 +206,10 @@ if __name__ == "__main__":
     
                     #redefine sequence
                     mySequence={}
-                    for key,value in ovThSequence.iteritems():
+                    for key,value in ovThSequence.items():
                         values=value.split(',')
                         mySequence[str(key)]={ 'vth1':str(values[0]),'vth2':str(values[1]),'vthe':str(values[2]),'ov':str(values[3]),'ovDrop':str(values[4]) }
-                        print('Sequence ID %s:%s'%(str(key),mySequence[str(key)]))
+                        print(('Sequence ID %s:%s'%(str(key),mySequence[str(key)])))
                     sequence=sorted(ovThSequence.keys())
                     sequenceCounter=0
 
@@ -236,7 +236,7 @@ if __name__ == "__main__":
                 runNumber = message.split()[1]
                 spillNumber = 0
 
-                commands.getoutput("mkdir -p %s/%s" % (tofhirConfig['fileNamePrefix'], runNumber))
+                subprocess.getoutput("mkdir -p %s/%s" % (tofhirConfig['fileNamePrefix'], runNumber))
 
                 ###---FIXME -> ASIC config CHECK how to close connection with daqd
                 if ('fixedConfig' in tofhirConfig):

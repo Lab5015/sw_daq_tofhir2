@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/env python3
 
 ###---H4DAQ statuses
 H4DAQStatuses = {

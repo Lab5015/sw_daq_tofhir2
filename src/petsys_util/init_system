@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import daqd, config
@@ -26,18 +26,18 @@ def main():
 
 	if args.print_config:
 		asicsConfig = connection.getAsicsConfig()
-		ac = asicsConfig.values()[0]
+		ac = list(asicsConfig.values())[0]
 
 		gc = ac.globalConfig
 		cc = ac.channelConfig[0]
 		
 		print("// GLOBAL CONFIG ---")
 		gc.printAllValues()
-		print("global_config = %s;" % gc)
+		print(("global_config = %s;" % gc))
 
 		print ("// CHANNEL CONFIG ---")
 		cc.printAllValues()
-		print("channel_config = %s;" % cc)
+		print(("channel_config = %s;" % cc))
 	
 
 	

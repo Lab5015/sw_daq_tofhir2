@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from time import sleep
 
@@ -92,13 +92,13 @@ def ltc_read_channels(conn):
 			status = r[1]
 			value = (r[2] << 16) + (r[3] << 8) + (r[4])
 			temperature = value / 1024.0                        
-                        if (temperature>10000):
-                            temperature=temperature-16384
+			if (temperature>10000):
+			    temperature=temperature-16384
 
 			if status == 0x01:
 				status_msg = "OK"
 			else:
 				status_msg = "ERR"
 			#print "CHIP %d CH %02d STATUS %03s (0x%02X) TEMP %10.3f C" % (chip, channel, status_msg, status, temperature)
-                        result[channel] = temperature
+			result[channel] = temperature
 	return result

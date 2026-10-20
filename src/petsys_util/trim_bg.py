@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 from petsys import daqd, tofhir2
@@ -29,7 +29,7 @@ def read_multimeter(port):
 def log(f, s):
 	f.write(s)
 	f.write('\n')
-	print s
+	print(s)
 
 def main(argv):
 	conn = daqd.Connection()
@@ -80,7 +80,7 @@ def main(argv):
 		expected_voltage = value + 1E6
 		selected_option_error = abs(value - target)
 		
-		for option, delta in trim_options.items():
+		for option, delta in list(trim_options.items()):
 
 			# If current value is above target + 4 mV, consider only negative trim options
 			if (value > (target + 4e-3)) and (delta >= 0): continue
@@ -98,7 +98,7 @@ def main(argv):
 		gc.setValue("EFUSE_A", selected_option)
 		conn._Connection__tofhir2_cmd(portID, slaveID, busID, chipID, 32, True, False, gc)		
 		
-		answer = raw_input("Proceed? (Y/N)")
+		answer = input("Proceed? (Y/N)")
 		if answer.lower() != 'y':
 			break
 		

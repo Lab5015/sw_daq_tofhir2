@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from petsys import daqd, config
@@ -106,17 +106,17 @@ asicsConfig = daqd.getAsicsConfig()
 activeAsics = daqd.getActiveAsics()
 
 if len(activeAsics) == 0:
-        print "no active ASICs found. Exiting..."
+        print("no active ASICs found. Exiting...")
         exit()
 else:
-        print "active ASICs found: "
-        print activeAsics
+        print("active ASICs found: ")
+        print(activeAsics)
 
 
 #--------------
 # trigger modes
 if args.trigger == "none":
-        print "### self-triggering mode ###"
+        print("### self-triggering mode ###")
 if args.trigger == "int":
         # Enable INTERNAL triggers from FEB/D to J15
         daqd.write_config_register_tgr(8, 0x21A, 0x81)
@@ -234,12 +234,12 @@ for ith1 in ith1_list:
                                                         cc.setValue("cfg_a2_pulse_trim_t",int(15))
                                                 #######################                                                                                                
                                                 if channelID == 0:
-                                                        print("%d %d %d %d : %d,%d,%d") % (portID,slaveID,chipID,channelID,dac_setting_ith1,dac_setting_ith2,dac_setting_ithe)
+                                                        print(("%d %d %d %d : %d,%d,%d") % (portID,slaveID,chipID,channelID,dac_setting_ith1,dac_setting_ith2,dac_setting_ithe))
                                 
                                 if( args.fixChannels ):
-                                        for ac in cfg.values():
+                                        for ac in list(cfg.values()):
                                                 for ch in args.fixChannels:                                                        
-                                                        print "fixing channel %d" % int(ch)                                                                                                                
+                                                        print("fixing channel %d" % int(ch))                                                                                                                
                                                         cc = ac.channelConfig[int(ch)]
                                                         dac_setting_ith1 = systemConfig.mapAsicChannelThresholdToDAC((portID, slaveID, chipID, channelID), "vth_t1", int(10))
                                                         cc.setValue("cfg_a3_ith_t1", dac_setting_ith1)
@@ -275,10 +275,10 @@ for ith1 in ith1_list:
                                 if args.wait:
                                         sleep(60.)
                                         args.wait = False
-                                print "ov: %3.1f,   ith1: %2d,   ith2: %2d,   ithe: %2d" % (float(ov), int(ith1), int(ith2), int(ithe))
-                                print ">>> t1: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t1"))
-                                print ">>> t2: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t2"))
-                                print ">>> e: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_e"))
+                                print("ov: %3.1f,   ith1: %2d,   ith2: %2d,   ithe: %2d" % (float(ov), int(ith1), int(ith2), int(ithe)))
+                                print(">>> t1: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t1")))
+                                print(">>> t2: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_t2")))
+                                print(">>> e: " + str(((cfg[(0,0,0)]).channelConfig[0]).getValue("cfg_a3_ith_e")))
                                 daqd.acquire(args.time, float(ov), 10000*(int(ith1)+1)+100*(int(ith2)+1)+int(ithe)+1)
                                         
 

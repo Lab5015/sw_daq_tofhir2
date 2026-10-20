@@ -26,28 +26,28 @@ class PiLas():
 
     def read_tune(self):
         """Return the laser tune [%]"""
-        print(self.instr.query("tune?"))
+        print((self.instr.query("tune?")))
 
     def read_freq(self):
         """Return the laser frequency [Hz]"""
-        print(self.instr.query("f?"))
+        print((self.instr.query("f?")))
 
     def check_state(self):
         """Return the laser state (0: OFF, 1: RUNNING)"""
-        print(self.instr.query("ld?"))
+        print((self.instr.query("ld?")))
 
     def set_state(self, value):
         """Set the laser state (0: OFF, 1: RUNNING)"""
-        print(self.instr.query("ld="+str(value)))
+        print((self.instr.query("ld="+str(value))))
 
     def set_trigger(self, value):
         """Set the laser trigger (0: int, 1: ext adj., 2: TTL)"""
-        print(self.instr.query("ts="+str(value)))
+        print((self.instr.query("ts="+str(value))))
         
     def set_tune(self, value):
         """Set the laser tune [%]"""
-        print(self.instr.query("tune="+str(value)))
+        print((self.instr.query("tune="+str(value))))
 
     def set_freq(self, value):
         """Set the laser frequency [Hz]"""
-        print(self.instr.query("f="+str(value)))
+        print((self.instr.query("f="+str(value))))

@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python3
 
 import ROOT
 import glob
@@ -52,7 +52,7 @@ for asic in asics:
             graph_ave.SetPoint(graph_ave.GetN(),v,1.*values[v]/len(infilenames))
             yMax = 1.*values[v]/len(infilenames)
         xMin = sorted(values.keys())[0]
-        xMax = sorted(values.keys())[len(values.keys())-1]
+        xMax = sorted(values.keys())[len(list(values.keys()))-1]
         
         c1 = ROOT.TCanvas('c1_ASIC%d_ALDO%s'%(asic,aldo),'c1_ASIC%d_ALDO%s'%(asic,aldo),1400,700)
         c1.Divide(2,1)
@@ -111,7 +111,7 @@ for asic in asics:
         latex.SetTextColor(ROOT.kRed)
         latex.Draw("same")
         
-        print('ASIC %d, ALDO %s:   Vbr = %.2f'%(asic,aldo,Vbr))
+        print(('ASIC %d, ALDO %s:   Vbr = %.2f'%(asic,aldo,Vbr)))
         c1.Print('../logs_%s/IV_ASIC%d_ALDO%s.png'%(args.label,asic,aldo))
         
         key='0       0       %d       %s'%(asic,aldo)

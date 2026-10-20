@@ -117,31 +117,31 @@ class PiLas():
 
     def read_tune(self):
         """Return the laser tune [%]"""
-        print(self.instr.query("tune?"))
+        print((self.instr.query("tune?")))
 
     def read_freq(self):
         """Return the laser frequency [Hz]"""
-        print(self.instr.query("f?"))
+        print((self.instr.query("f?")))
 
     def check_state(self):
         """Return the laser state (0: OFF, 1: RUNNING)"""
-        print(self.instr.query("ld?"))
+        print((self.instr.query("ld?")))
 
     def set_state(self, value):
         """Set the laser state (0: OFF, 1: RUNNING)"""
-        print(self.instr.query("ld="+str(value)))
+        print((self.instr.query("ld="+str(value))))
 
     def set_trigger(self, value):
         """Set the laser trigger (0: int, 1: ext adj., 2: TTL)"""
-        print(self.instr.query("ts="+str(value)))
+        print((self.instr.query("ts="+str(value))))
 
     def set_tune(self, value):
         """Set the laser tune [%]"""
-        print(self.instr.query("tune="+str(value)))
+        print((self.instr.query("tune="+str(value))))
 
     def set_freq(self, value):
         """Set the laser frequency [Hz]"""
-        print(self.instr.query("f="+str(value)))
+        print((self.instr.query("f="+str(value))))
 
 
 ##########################
@@ -161,7 +161,7 @@ class Keithley2450():
 
     def query(self, query):
         """Pass a query to the power supply"""
-        print(self.instr.query(query).strip())
+        print((self.instr.query(query).strip()))
 
     def meas_V(self):
         """Return time and voltage"""
@@ -222,7 +222,7 @@ class Keithley2231A():
 
     def query(self, query):
         """Pass a query to the power supply"""
-        print(self.instr.query(query).strip())
+        print((self.instr.query(query).strip()))
 
     def meas_V(self):
         """read set voltage"""
@@ -375,10 +375,10 @@ class sipmPower():
         self.new_voltage = min([max([self.new_voltage,self.min_voltage]),self.max_voltage])
 
         if self.debug:
-            print(datetime.now())
+            print((datetime.now()))
             p, i, d = self.pid.components
-            print("== DEBUG == P=", p, "I=", i, "D=", d)
-            print("--- setting SiPM voltage to "+str(self.new_voltage)+" V    [sipm current: "+str(self.I)+" sipm power: "+str(self.P)+" W]\n")
+            print(("== DEBUG == P=", p, "I=", i, "D=", d))
+            print(("--- setting SiPM voltage to "+str(self.new_voltage)+" V    [sipm current: "+str(self.I)+" sipm power: "+str(self.P)+" W]\n"))
             sys.stdout.flush()
 
         self.sipm.set_V(self.new_voltage)
@@ -454,8 +454,8 @@ class sipmTemp():
             (date, I, V) = self.TEC.meas_IV()
             print(date)
             p, i, d = self.pid.components
-            print("== DEBUG == P=", p, "I=", i, "D=", d)
-            print("--- setting TEC power to "+str(I*V)+" W    [sipm temp: "+str(self.sipm_temp)+" C]\n")
+            print(("== DEBUG == P=", p, "I=", i, "D=", d))
+            print(("--- setting TEC power to "+str(I*V)+" W    [sipm temp: "+str(self.sipm_temp)+" C]\n"))
             sys.stdout.flush()
 
         self.TEC.set_V(self.new_voltage)

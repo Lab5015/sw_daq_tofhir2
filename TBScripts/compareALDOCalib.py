@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python3
 
 import sys
 import ROOT
@@ -34,7 +34,7 @@ graphs = {}
 graphs_diff = {}
 graphs_deltaV = {}
 
-for key in infiles.keys():
+for key in list(infiles.keys()):
     infile = infiles[key]
     
     graphs[key] = ROOT.TGraph()
@@ -52,7 +52,7 @@ for key in infiles.keys():
             
             it += 1
 
-for key in infiles.keys():
+for key in list(infiles.keys()):
     if key == ref:
         continue
     for point in range(0,graphs[key].GetN()):
@@ -69,7 +69,7 @@ hPad1.SetTitle(";DAC;V_{out} [V]")
 hPad1.Draw()
 
 it = 0
-for key in infiles.keys():
+for key in list(infiles.keys()):
     it += 1
     graph = graphs[key]
     graph.SetLineColor(it)
@@ -83,7 +83,7 @@ hPad2.SetTitle(";DAC;diff. V_{out} [V]")
 hPad2.Draw()
 
 it = 0
-for key in infiles.keys():
+for key in list(infiles.keys()):
     it += 1
     if key == ref:
         continue
@@ -99,10 +99,10 @@ hPad3.SetTitle(";DAC; #DeltaV_{out}/DAC [V]")
 hPad3.Draw()
 
 it = 0
-for key in infiles.keys():
+for key in list(infiles.keys()):
     it += 1
     graph = graphs_deltaV[key]
     graph.SetLineColor(it)
     graph.Draw("L,same")
 
-raw_input('ok?')
+input('ok?')

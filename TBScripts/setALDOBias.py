@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import sys
 import time
 from optparse import OptionParser
@@ -16,7 +16,7 @@ mapping = [ ['keithley2231A-0','CH1'], ['keithley2231A-0','CH2'] ]
 for ch in mapping:
     mykey = Keithley2231A('ASRL/dev/'+ch[0]+'::INSTR', ch[1])
     currV = mykey.meas_V()
-    print("current voltage is %.2f V") % currV
+    print(("current voltage is %.2f V") % currV)
     
     if options.power == "1" and currV < 0.1:
         print("ramping up...")
@@ -26,7 +26,7 @@ for ch in mapping:
             time.sleep(0.2)
             I = mykey.meas_I()
             V = mykey.meas_V()
-            print("v_set: %.2f V  v_meas: %.2f V  i_meas: %.3f A") %(volt,V,I)
+            print(("v_set: %.2f V  v_meas: %.2f V  i_meas: %.3f A") %(volt,V,I))
             
     elif options.power == "0" and currV > 0.1:
         print("ramping down...")
@@ -36,7 +36,7 @@ for ch in mapping:
             time.sleep(0.2)
             I = mykey.meas_I()
             V = mykey.meas_V()
-            print("v_set: %.2f V  v_meas: %.2f V  i_meas: %.3f A") %(volt,V,I)
+            print(("v_set: %.2f V  v_meas: %.2f V  i_meas: %.3f A") %(volt,V,I))
             
     else:
         print("doing nothing")
@@ -44,6 +44,6 @@ for ch in mapping:
     time.sleep(2)
     I = mykey.meas_I()
     V = mykey.meas_V()
-    print("voltage: %.2f V   current: %.3f A") %(V,I)
+    print(("voltage: %.2f V   current: %.3f A") %(V,I))
     
 

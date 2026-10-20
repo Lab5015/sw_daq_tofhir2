@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os
 import argparse
@@ -43,11 +43,11 @@ if args.mode == 'e':
     for infile in infiles:
         basename = infile.replace('.rawf','')
         spill = basename.replace(folder+"/",'')
-        print(basename,folder,spill)
+        print((basename,folder,spill))
         command = "mkdir /data1/cmsdaq/tofhir2/h8/reco/"+args.run+"/"
         os.system(command)
         mainCommand = "./convert_raw_to_event --config "+args.config+" -i "+basename+" --writeRoot"
-        print mainCommand
+        print(mainCommand)
         if args.pedestals:
             #command = "./convert_raw_to_singles --config "+args.config+" -i /data1/cmsdaq/tofhir2/h8/raw/run"+args.run+"_ped1 -o /data1/cmsdaq/tofhir2/h8/reco/run"+args.run+"_ped1_s.root --writeRoot"
             #os.system(command)
@@ -59,10 +59,10 @@ if args.mode == 'e':
             command = command.replace('/raw/','/reco/')
             os.system(command)
             mainCommand += " --pedestals -o /data1/cmsdaq/tofhir2/h8/reco/"+args.run+"/"+spill+"_ped_e.root"
-            print mainCommand
+            print(mainCommand)
         else:
             mainCommand += " -o /data1/cmsdaq/tofhir2/h8/reco/"+args.run+"/"+spill+"_e.root"
-            print mainCommand
+            print(mainCommand)
         if args.refChannels :
             mainCommand += " --coincidence --refChannels "+args.refChannels
         if args.trigChannel :

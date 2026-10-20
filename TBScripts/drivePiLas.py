@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 from Lab5015_utils import PiLas
 from optparse import OptionParser
@@ -14,11 +14,11 @@ parser.add_option("--trigger", dest="trigger", default="0")
 
 las = PiLas()
 
-print("set tune to " + str(options.tune) + "%")
+print(("set tune to " + str(options.tune) + "%"))
 las.set_tune(str(float(options.tune)*10.))
-print("set freq to " + options.freq + " Hz")
+print(("set freq to " + options.freq + " Hz"))
 las.set_freq(options.freq)
-print("set trigger to " + options.trigger)
+print(("set trigger to " + options.trigger))
 las.set_trigger(options.trigger)
-print("power is " + options.power)
+print(("power is " + options.power))
 las.set_state(options.power)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from bitarray import bitarray
-from bitarray_utils import intToBin, binToInt, grayToBin, grayToInt
+from .bitarray_utils import intToBin, binToInt, grayToBin, grayToInt
 
 def nrange(start, end):
 	r = [x for x in range(start, end) ]
@@ -146,22 +146,22 @@ class AsicGlobalConfig(bitarray):
 
 	## Prints the content of all parameters as a bitarray	
 	def printAllBits(self):
-		for key in self.__fields.keys():
-			print key, " : ", self.getBits(key)
+		for key in list(self.__fields.keys()):
+			print(key, " : ", self.getBits(key))
 
 	## Prints the content of all parameters as integers
 	def printAllValues(self):
-		unsorted = [ (min(bitList), name) for name, bitList in self.__fields.items() ]
+		unsorted = [ (min(bitList), name) for name, bitList in list(self.__fields.items()) ]
 		unsorted.sort()
 		for b, key in unsorted:
 			bitList = self.__fields[key]
 			l = bitList[0]
 			r = bitList[-1]
-			print "%30s : %3d : %20s : %d..%d" % (key, self.getValue(key), self.getBits(key), l, r)
+			print("%30s : %3d : %20s : %d..%d" % (key, self.getValue(key), self.getBits(key), l, r))
 
 	## Returns all the keys (variables) in this class
 	def getKeys(self):
-		return self.__fields.keys()
+		return list(self.__fields.keys())
 
 ## Contains parameters and methods related to the operation of one channel of the ASIC. 
 class AsicChannelConfig(bitarray):
@@ -285,18 +285,18 @@ class AsicChannelConfig(bitarray):
 
 	# Prints the content of all parameters as a bitarray		
 	def printAllBits(self):
-		for key in self.__fields.keys():
-			print key, " : ", self.getBits(key)
+		for key in list(self.__fields.keys()):
+			print(key, " : ", self.getBits(key))
 		
 	## Prints the content of all parameters as integers
 	def printAllValues(self):
-		unsorted = [ (min(bitList), name) for name, bitList in self.__fields.items() ]
+		unsorted = [ (min(bitList), name) for name, bitList in list(self.__fields.items()) ]
 		unsorted.sort()
 		for b, key in unsorted:
 			bitList = self.__fields[key]
 			l = bitList[0]
 			r = bitList[-1]
-			print "%30s : %3d : %20s : %d..%d" % (key, self.getValue(key), self.getBits(key), l, r)
+			print("%30s : %3d : %20s : %d..%d" % (key, self.getValue(key), self.getBits(key), l, r))
 
 	## Set the baseline value in units of ADC (63 to 0)
 	def setBaseline(self, v):
@@ -308,7 +308,7 @@ class AsicChannelConfig(bitarray):
 
 	## Returns all the keys (variables) in this class
 	def getKeys(self):
-		return self.__fields.keys()
+		return list(self.__fields.keys())
 
 ## A class containing instances of AsicGlobalConfig and AsicChannelConfig
 #, as well as 2 other bitarrays related to test pulse configuration. Is related to one given ASIC.

@@ -49,7 +49,7 @@ class TXP3510P:
         return r
 
     def setVoltage(self,value):
-        print('Setting voltage to %.2f'%value)
+        print(('Setting voltage to %.2f'%value))
         if (not 'tcp://' in self.port):
             r=self.serial.readline().strip()
         self.serial.write('V1 %f\r\n'%value)
@@ -57,7 +57,7 @@ class TXP3510P:
         return r
 
     def setCurrent(self,value):
-        print('Setting max current to %.2f'%value)
+        print(('Setting max current to %.2f'%value))
         if (not 'tcp://' in self.port):
             r=self.serial.readline().strip()
         self.serial.write('I1 %f\r\n'%value)
