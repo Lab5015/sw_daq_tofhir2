@@ -107,10 +107,10 @@ add_library ( common STATIC
 	"src/base/CoincidenceGrouper.cpp"
 )
 add_executable("process_tdc_calibration" "src/petsys_util/process_tdc_calibration.cpp" )
-target_link_libraries("process_tdc_calibration" common)
+target_link_libraries("process_tdc_calibration" common Minuit)
 
 add_executable("process_qdc_calibration" "src/petsys_util/process_qdc_calibration.cpp" )
-target_link_libraries("process_qdc_calibration" common)
+target_link_libraries("process_qdc_calibration" common Minuit)
 
 add_executable("convert_raw_to_raw" "src/petsys_util/convert_raw_to_raw.cpp" )
 target_link_libraries("convert_raw_to_raw" common)

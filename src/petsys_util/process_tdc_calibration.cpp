@@ -22,6 +22,7 @@
 
 #include <TF1.h>
 #include <Math/MinimizerOptions.h>
+#include <TLinearFitter.h>
 #include <TH1S.h>
 #include <TH1D.h>
 #include <TH2S.h>
@@ -29,6 +30,29 @@
 #include <TGraphErrors.h>
 #include <TFile.h>
 #include <TCanvas.h>
+
+// ROOT 6.40 as packaged in EPEL 9 is built with _GLIBCXX_ASSERTIONS: when the least-squares
+// matrix of a polynomial fit is singular, TLinearMinimizer::X() calls front() on an empty vector
+// and the process aborts (on CentOS 7 / ROOT 6.24 the failure was silently ignored).
+// Check beforehand, with the same points TH1::Fit uses, that the linear fit can be solved.
+static bool linearFitPossible(TProfile *p, int order, double xMin, double xMax)
+{
+	char formula[16];
+	sprintf(formula, "pol%d", order);
+	TLinearFitter lf(1, formula);
+	int nPoints = 0;
+	for(int i = 1; i <= p->GetNbinsX(); i++) {
+		double x = p->GetBinCenter(i);
+		if(x < xMin || x > xMax) continue;
+		double e = p->GetBinError(i);
+		if(e <= 0) continue;
+		lf.AddPoint(&x, p->GetBinContent(i), e);
+		nPoints++;
+	}
+	if(nPoints <= order) return false;
+	return lf.Eval() == 0;
+}
+
 
 using namespace PETSYS;
 
@@ -502,8 +526,11 @@ void calibrateAsic(
 			
 		float tEdgeTolerance = upperT0 - lowerT0;
 		// Fit a line to a TDC period to determine the interpolation factor
-		pFine->Fit("pol1", "Q", "", tEdge + tEdgeTolerance, tEdge + TDC_PERIOD  - tEdgeTolerance);
-		TF1 *fPol = pFine->GetFunction("pol1");
+		TF1 *fPol = NULL;
+		if(linearFitPossible(pFine, 1, tEdge + tEdgeTolerance, tEdge + TDC_PERIOD  - tEdgeTolerance)) {
+			pFine->Fit("pol1", "Q", "", tEdge + tEdgeTolerance, tEdge + TDC_PERIOD  - tEdgeTolerance);
+			fPol = pFine->GetFunction("pol1");
+		}
 		if(fPol == NULL) {
 			fprintf(stderr, "WARNING: Could not make a linear fit. Skipping TAC (%02u %02d %02d %02d %u %c)\n",
 				portID, slaveID, chipID, channelID, tacID, bStr);
