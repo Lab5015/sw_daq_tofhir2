@@ -25,6 +25,7 @@
 
 #include <TF1.h>
 #include <Math/MinimizerOptions.h>
+#include <TLinearFitter.h>
 #include <TH1S.h>
 #include <TH1D.h>
 #include <TH2S.h>
@@ -33,6 +34,29 @@
 #include <TFile.h>
 #include <TCanvas.h>
 #include <TStyle.h>
+
+// ROOT 6.40 as packaged in EPEL 9 is built with _GLIBCXX_ASSERTIONS: when the least-squares
+// matrix of a polynomial fit is singular, TLinearMinimizer::X() calls front() on an empty vector
+// and the process aborts (on CentOS 7 / ROOT 6.24 the failure was silently ignored).
+// Check beforehand, with the same points TH1::Fit uses, that the linear fit can be solved.
+static bool linearFitPossible(TProfile *p, int order, double xMin, double xMax)
+{
+	char formula[16];
+	sprintf(formula, "pol%d", order);
+	TLinearFitter lf(1, formula);
+	int nPoints = 0;
+	for(int i = 1; i <= p->GetNbinsX(); i++) {
+		double x = p->GetBinCenter(i);
+		if(x < xMin || x > xMax) continue;
+		double e = p->GetBinError(i);
+		if(e <= 0) continue;
+		lf.AddPoint(&x, p->GetBinContent(i), e);
+		nPoints++;
+	}
+	if(nPoints <= order) return false;
+	return lf.Eval() == 0;
+}
+
 
 using namespace PETSYS;
 
@@ -490,6 +514,9 @@ void calibrateAsic(
 		for(int order = 3; (order <= 9) && !entry.valid; order++) {
 			char functionName[16];
 			sprintf(functionName, "pol%d", order);
+
+			if(!linearFitPossible(pFine, order, xMin, xMax)) // No fit (singular matrix)
+				break;
 
 			pFine->Fit(functionName, "Q", "", xMin, xMax);
 			TF1 *polN = pFine->GetFunction(functionName);

@@ -33,7 +33,7 @@ These `build/` versions were imported into `src/petsys_util/` on the `tofhir2b-p
 | Script | Main difference from `src/` |
 |---|---|
 | `acquire_tdc_calibration` | test pulse interval `1024*2` instead of `1024`. **Needed for sensible TDC calibrations.** The same fix is in GitHub commit `f5a4915` "add 2x factor to get sensible tdc calibrations" |
-| `acquire_qdc_calibration` | pandas-based fast QDC trimming, `--att` (required by `configuration.template.sh`) and `--trimE` options, interval `1024*2` in the main acquisition. **Needed for the QDC calibration.** |
+| `acquire_qdc_calibration` | pandas-based fast QDC trimming, `--att` (required by `configuration.template.sh`) and `--trimE` options, interval `1024*2` in the main acquisition. **Needed for the QDC calibration.** In the port the main acquisition interval is back to `1024` (see §3.1) |
 | `acquire_sipm_data_scan`, `acquire_sipm_stressTest`, `scan_aldo_hv`, `create_ALDO_calibration_combined.py` | lab updates (2023–2026) |
 
 The library in `build/petsys/` was identical to `src/petsys_py_lib/`.
@@ -165,6 +165,44 @@ Notes:
 - The PCIe kernel driver (`src/kernel/psdaq.c`) was **not** ported. It is not needed with the Ethernet DAQ
   (`--daq-type GBE`), and it does not compile on the AlmaLinux 9 kernel (`class_create`, `dev_uevent`).
   `daqd` still builds because it only uses the driver header.
+- **`process_qdc_calibration` / `process_tdc_calibration` crash (EPEL ROOT):** the EPEL 9 ROOT is built with
+  `_GLIBCXX_ASSERTIONS`. When a polynomial fit has fewer points than parameters (e.g. 3 points for `pol3`) the
+  linear fitter fails ("matrix not positive definite") and `TLinearMinimizer::X()` calls `front()` on an empty
+  vector: the assertion aborts the forked worker (SIGABRT, printed on the terminal, not in the log) and all the
+  remaining QACs of the ASIC are left uncalibrated (e.g. only 3-65 entries per attenuator setting). On CentOS 7 the
+  same fit silently returned arbitrary parameters. Fix: `linearFitPossible()` checks the linear fit with
+  `TLinearFitter` before `TProfile::Fit`; if it cannot be solved the fit of that order is treated as failed
+  ("Could not make a fit"). The two programs are now linked against `libMinuit` (`CMakeLists.txt`).
+
+### 3.1 QDC calibration: test pulse interval and TAC rotation
+
+Found on 2026-10-20. With the test pulse every **2048 clk** (`1024*2`, as in the CentOS 7 `build/` script) and the
+TAC refresh enabled (default `c_tac_refresh_en = 1`, `c_tac_refresh_t = 3`, `c_tac_max_age = 29`, i.e. a refresh
+period of 64·4·30 = 7680 clk), every test pulse advances the channel TAC pointer by **2**: one TAC records the event
+and one is consumed by the refresh. During one (phase, length) step of `acquire_qdc_calibration` a channel then fills
+**only its 4 even or only its 4 odd TACs**; the parity changes only between steps, essentially at random.
+For some channels (always pairs `c`, `c+16`, which are acquired together) the TACs of one parity receive only
+a few steps, all at long integration times: 3 points in the fit range, an underdetermined `pol3`.
+- On CentOS 7 this gave either "Could not make a fit" or arbitrary polynomials that fit the 3 points but are
+  hundreds of ADC off at short integration times (`ProcessHit` evaluates the polynomial at any integration time).
+- On AlmaLinux 9 (with the fix above) these QACs are left uncalibrated (flag 0x4, "missing QDC calibration").
+
+Measurements on the board (att 1, channels 13 and 29, refresh on, 33 steps of 20 ms):
+
+| Test pulse interval (clk) | Every step fills all 8 TACs |
+|---|---|
+| **1024**, 1900, 2150-2200, 2350-2400, 3050-3100, 7000-8000 | yes |
+| 1536, 2000, 2047, **2048**, 2049, 2250-2300, 2500, 3000, 3200, 4096, 9000 | no (one parity, or partial mixing) |
+
+- `c_tac_refresh_en = 0` also restores the rotation, but shifts the QDC pedestals by about -10 ADC with respect to
+  refresh on (the TACs stay idle much longer). Not used: data taking runs with the refresh on.
+- **Adopted:** main acquisition of `acquire_qdc_calibration` with interval **1024**. Same pedestals as with 2048 for
+  the QACs that had data (-0.2 ADC mean, rms 0.3), 256/256 QACs calibrated for all attenuator settings 0-7.
+  The QDC trimming loop already used 1024 in the CentOS 7 version.
+- The TDC calibration is not affected (all TACs get all 165 phases with 2048) and keeps `1024*2`.
+- The windows depend on `c_tac_refresh_t` and `c_tac_max_age`: if those are changed, check the TAC occupancy again.
+- Pedestals also drift with time: -7.5 ADC between two calibrations taken a few hours apart on 2026-10-20 with the
+  same settings.
 
 ---
 
@@ -212,7 +250,9 @@ Manual fixes (errors that Python 3 does not report, but that produce wrong data)
 - `FrameServer.cpp`, `DAQFrameServer.cpp`: added the missing `return` in non-void functions
   (undefined behaviour with gcc 11).
 - `shm_raw_py.cpp`: free the buffer in `events_as_bytes` (memory leak).
-- `process_tdc_calibration.cpp`, `process_qdc_calibration.cpp`: use the Minuit minimizer as on CentOS 7 (see §3).
+- `process_tdc_calibration.cpp`, `process_qdc_calibration.cpp`: use the Minuit minimizer as on CentOS 7, check that
+  the polynomial fit can be solved before fitting (`linearFitPossible`), link against `libMinuit` (see §3).
+- `acquire_qdc_calibration`: test pulse interval 1024 in the main acquisition (see §3.1).
 
 ### 4.3 Pre-existing Python 2 bugs, fixed
 - `fe_tester.py`: on over-current, the warning `print` raised an exception **before** the UUT power was switched off.
@@ -256,6 +296,10 @@ In addition:
 - full build with no errors or warnings on AlmaLinux 9 (host and container);
 - **hardware test** (`pc-mtd-tray`, FEB/D with ASIC 0 only): `init_system` and
   `init_system --config config/2C/config_ith1_attGain0.ini` work.
+- **calibrations on hardware** (2026-10-20): TDC 512/512 TACs; the TDC table matches CentOS 7 on the same raw data
+  (510/512 TACs within 0.1%). QDC on the CentOS 7 raw data of `config/2C_HYPER`: all entries in common with the
+  CentOS 7 tables are identical; the QACs only present on CentOS 7 are the underdetermined fits of §3.1.
+  QDC acquired on AlmaLinux 9 with interval 1024: 256/256 QACs for attenuator settings 0-7.
 
 ---
 
@@ -269,3 +313,6 @@ In addition:
   `TBScripts/acquire_sipm_IV_scan_K2000` (duplicate of the `.py`), `src/petsys_py_lib/tofpet2b.py` and `tofpet2c.py`
   (not installed).
 - The old `INSTALL_SW_REQUIREMENTS_CENTOS.sh` was left unchanged.
+- GitHub version (`tofhir2b-py3-alma9-newfw`): the QDC main acquisition was set to interval 1024 as in the tested
+  version, but it was **not tested** with the new firmware. Its QDC trimming loop still uses `2*1024` (as in
+  upstream): check the TAC occupancy (§3.1) when that firmware is installed.
