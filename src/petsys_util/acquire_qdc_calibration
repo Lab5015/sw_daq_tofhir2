@@ -40,7 +40,6 @@ def main(argv):
 	args = parser.parse_args()
 
 	fileNamePrefix = args.fileNamePrefix + ( "%d"%args.att )
-	# AAAAAAAAAA : simo --- guarda anche sotto
 	if args.trimE is not None:
 		fileNamePrefix = fileNamePrefix + ("_trimE%d"%args.trimE)
 
@@ -55,7 +54,7 @@ def main(argv):
 	lengthStep = 1
 	if not os.path.exists(fileNamePrefix) or not os.path.samefile(args.fileNamePrefix, "/dev/null"):
 		f = open(fileNamePrefix + '.bins', 'w')
-		f.write("%d\t%f\t%f\n" % (nPhases*nLengths/lengthStep, 0, nLengths))
+		f.write("%d\t%f\t%f\n" % (nPhases*nLengths//lengthStep, 0, nLengths))
 		f.close()
 
 	asicsConfig = conn.getAsicsConfig()
@@ -69,14 +68,13 @@ def main(argv):
 			cc.setValue("c_min_q", 0)
 			cc.setValue("c_max_q", largeWindow)
 			cc.setValue("cfg_a2_attenuator_gain", args.att)
-			# AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 			if args.trimE is not None:
 				cc.setValue("cfg_a2_pulse_trim_e", args.trimE)
 
 	# Clamp down simulatenous channels due to system limitations
 	# 62/(12*2) -- GbE interface: 63 events/frame with unit, 12 ports per unit, 2 ASIC per port
 	# 1024/180 -- ASIC TX: 1024 clock/frame (x1 SDR), 160 bits per event (TOFHiR 2B bug)
-	simultaneousChannels = min([62/(12*2), 1024/180])
+	simultaneousChannels = min([62//(12*2), 1024//180])
 
 	channelStep = int(math.ceil(32.0/simultaneousChannels))
 
@@ -146,7 +144,7 @@ def main(argv):
 						df2 = pd.DataFrame( nparr )
 
 						# create table with one line per channel, and multiindex column: both number of events and sum of qFine values are stored for each tacID
-						df_int[integrationTime] = pd.pivot_table(df2, values="qFine", index=["channelID"], columns=["tacID"], aggfunc=[np.sum,len])
+						df_int[integrationTime] = pd.pivot_table(df2, values="qFine", index=["channelID"], columns=["tacID"], aggfunc=["sum",len])
 
 					# add dataframes for different integration windows as new columns (with additional index level)
 					df_phase[n] = pd.concat(df_int,axis=1)

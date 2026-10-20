@@ -46,7 +46,7 @@ for ac in list(asicsConfig.values()):
 # Clamp down simulatenous channels due to system limitations
 # 50/(2*10) -- GbE interface: sustainable average of 50 events/frame, 10 ports per unit, 2 ASIC per port
 # 1024/180 -- ASIC TX: 1024 clock/frame (x1 SDR), 160 bits per event (TOFHiR 2B bug)
-simultaneousChannels = min([50/(2*10), 1024/180])
+simultaneousChannels = min([50//(2*10), 1024//180])
 
 channelStep = int(math.ceil(32.0/simultaneousChannels))
 

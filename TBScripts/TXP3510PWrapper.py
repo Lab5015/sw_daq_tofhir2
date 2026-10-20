@@ -1,13 +1,23 @@
 import serial
 from time import sleep
 from SerialClient import serialClient
+
+# pyserial works with bytes in Python 3; expose the same str interface as serialClient
+class _TextSerial:
+    def __init__(self, port):
+        self.port = port
+    def write(self, msg):
+        return self.port.write(msg.encode())
+    def readline(self):
+        return self.port.readline().decode(errors='replace')
+
 class TXP3510P:
     def __init__(self,port):
         self.port=port
         if ('tcp://' in port):
             self.serial = serialClient(port)
         else:
-            self.serial = serial.Serial(port, 9600,timeout=0)
+            self.serial = _TextSerial(serial.Serial(port, 9600,timeout=0))
 
         if (not 'tcp://' in self.port):
             r=self.serial.readline().strip()

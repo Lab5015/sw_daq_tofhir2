@@ -68,7 +68,7 @@ class GUI:
             # Check if there are other instances of daqd
             isDaqdPresent = subprocess.call(["pidof", "daqd"],stdout=subprocess.PIPE)
             if isDaqdPresent == 0:
-                daqdPids = subprocess.check_output(["pidof", "daqd"])
+                daqdPids = subprocess.check_output(["pidof", "daqd"], universal_newlines=True)
                 pidsToKill = daqdPids.split(" ")
                 
                 if self.show_confirmation_dialog("There are other instances of daqd running in the system. Kill them and open a new instance?"):
@@ -94,7 +94,7 @@ class GUI:
             isDaqdPresent = subprocess.call(["pidof", "daqd"], stdout= subprocess.PIPE) == 0
          
             if isDaqdPresent:
-                daqdPid = subprocess.check_output(["pidof", "daqd"])
+                daqdPid = subprocess.check_output(["pidof", "daqd"], universal_newlines=True)
                 self.__daqdPid = daqdPid.split(" ")[0]
             else:
                 self.__daqdPid = None

@@ -62,7 +62,7 @@ def build_command(command_type, chipID, channelID, asicsConfig, print_flags, ith
 	asic_s = (", ").join(["...", "K28.5",  "K28.1" ] + [ "0x%02X" % v for v in composed_command[0: ] ] + [ "K28.5", "..."])
 	cmd32 = [0 for n in range(9)]
 	for n, v in enumerate(composed_command[5:]):
-		idx32 = n/4 
+		idx32 = n//4
 		sh32 = n % 4
 		sh32 *= 8
 

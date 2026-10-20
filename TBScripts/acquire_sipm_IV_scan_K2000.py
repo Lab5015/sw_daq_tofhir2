@@ -80,7 +80,7 @@ asicsConfig0 = deepcopy(asicsConfig)
 cfg = deepcopy(asicsConfig0)
 
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
+        if chipID%2 != 0:
                 continue
         if int(chipID) != args.asic:
             continue
@@ -120,7 +120,7 @@ if (args.calib):
 #--------
 # ov scan
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
+        if chipID%2 != 0:
                 continue
         if int(chipID) != args.asic:
             continue
@@ -133,9 +133,9 @@ for portID, slaveID, chipID in activeAsics:
                     voltA, voltB = systemConfig.mapALDODACToVoltage((portID, slaveID, chipID),dac)
                     volt = 0.
 
-                    if args.aldo is "A":
+                    if args.aldo == "A":
                         volt = float(voltA)                
-                    if args.aldo is "B":
+                    if args.aldo == "B":
                         volt = float(voltB)
                     if volt < float(args.bvMin):
                         continue
@@ -145,11 +145,11 @@ for portID, slaveID, chipID in activeAsics:
                     g_I[volt] = ROOT.TGraph()
                 
                 gc = (cfg[(portID, slaveID, chipID)]).globalConfig
-                if args.aldo is "A":
+                if args.aldo == "A":
                     gc.setValue("c_aldo_en", 0b10)
                     gc.setValue("Valdo_A_DAC", dac)
 
-                if args.aldo is "B":
+                if args.aldo == "B":
                     gc.setValue("c_aldo_en", 0b01)
                     gc.setValue("Valdo_B_DAC", dac)
 
@@ -224,7 +224,7 @@ for portID, slaveID, chipID in activeAsics:
 # switch off bias voltages
 
 for portID, slaveID, chipID in activeAsics:
-        if chipID%2 is not 0:
+        if chipID%2 != 0:
                 continue
         gc = (cfg[(portID, slaveID, chipID)]).globalConfig
         gc.setValue("c_aldo_en", 0b00)

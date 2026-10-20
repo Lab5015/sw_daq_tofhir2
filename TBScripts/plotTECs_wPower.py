@@ -17,15 +17,15 @@ graphsR = {}
 
 for it in range(0, 4, 1):
     graphs[it]  = ROOT.TGraph()
-    graphs[it].SetTitle(Form("T: ASIC %d, side %d"%(it%2*2,it/2) ) )
+    graphs[it].SetTitle(Form("T: ASIC %d, side %d"%(it%2*2,it//2) ) )
     graphsV[it] = ROOT.TGraph()
-    graphsV[it].SetTitle(Form("V: ASIC %d, side %d"%(it%2*2,it/2) ) )
+    graphsV[it].SetTitle(Form("V: ASIC %d, side %d"%(it%2*2,it//2) ) )
     graphsI[it] = ROOT.TGraph()
-    graphsI[it].SetTitle(Form("I: ASIC %d, side %d"%(it%2*2,it/2) ) )
+    graphsI[it].SetTitle(Form("I: ASIC %d, side %d"%(it%2*2,it//2) ) )
     graphsW[it] = ROOT.TGraph()
-    graphsW[it].SetTitle(Form("W: ASIC %d, side %d"%(it%2*2,it/2) ) )
+    graphsW[it].SetTitle(Form("W: ASIC %d, side %d"%(it%2*2,it//2) ) )
     graphsR[it] = ROOT.TGraph()
-    graphsR[it].SetTitle(Form("R: ASIC %d, side %d"%(it%2*2,it/2) ) )
+    graphsR[it].SetTitle(Form("R: ASIC %d, side %d"%(it%2*2,it//2) ) )
     
 f = open("/data/tofhir2/conf", "r")
 conf = float(f.read())
@@ -77,7 +77,7 @@ hPad1.Draw()
 
 for it in range(0, 4, 1):
     graph = graphs[it]
-    graph.SetLineStyle(1+it/2)
+    graph.SetLineStyle(1+it//2)
     graph.SetLineColor(1+it)
     graph.SetMarkerColor(1+it)
     graph.Draw("PL,same")
@@ -93,7 +93,7 @@ hPad1.Draw()
 
 for it in range(0, 4, 1):
     graphV = graphsV[it]
-    graphV.SetLineStyle(1+it/2)
+    graphV.SetLineStyle(1+it//2)
     graphV.SetLineColor(1+it)
     graphV.SetMarkerColor(1+it)
     graphV.Draw("PL,same")
@@ -110,7 +110,7 @@ hPad1.Draw()
 
 for it in range(0, 4, 1):
     graphI = graphsI[it]
-    graphI.SetLineStyle(1+it/2)
+    graphI.SetLineStyle(1+it//2)
     graphI.SetLineColor(1+it)
     graphI.SetMarkerColor(1+it)
     graphI.Draw("PL,same")
@@ -127,7 +127,7 @@ hPad1.Draw()
 
 for it in range(0, 4, 1):
     graphW = graphsW[it]
-    graphW.SetLineStyle(1+it/2)
+    graphW.SetLineStyle(1+it//2)
     graphW.SetLineColor(1+it)
     graphW.SetMarkerColor(1+it)
     graphW.Draw("PL,same")
@@ -145,7 +145,7 @@ hPad1.Draw()
 
 for it in range(0, 4, 1):
     graphR = graphsR[it]
-    graphR.SetLineStyle(1+it/2)
+    graphR.SetLineStyle(1+it//2)
     graphR.SetLineColor(1+it)
     graphR.SetMarkerColor(1+it)
     graphR.Draw("PL,same")

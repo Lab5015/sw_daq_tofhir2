@@ -17,6 +17,7 @@ class SMChiller():
 
     def __init__(self, portname='tcp://127.0.0.1:5050', slaveaddress=1):
         if 'tcp://' in portname:
+            from SerialClient import serialClient
             self.serial = serialClient(portname)
         else:
             print("ERROR: specify TCP address for communication")
@@ -343,7 +344,7 @@ class sipmPower():
 
 
     def power_on(self):
-        if self.state is 0:
+        if self.state == 0:
             print("--- powering on the PS")
             self.sipm.set_V(0.0)
             self.sipm.set_state(1)
@@ -353,7 +354,7 @@ class sipmPower():
                 raise ValueError("### ERROR: PS did not power on")
 
     def power_off(self):
-        if self.state is 1:
+        if self.state == 1:
             print("--- powering off the PS")
             self.sipm.set_V(0.0)
             self.sipm.set_state(0)
@@ -419,7 +420,7 @@ class sipmTemp():
 
 
     def power_on(self):
-        if self.state is 0:
+        if self.state == 0:
             print("--- powering on the PS")
             self.TEC.set_V(0.0)
             self.TEC.set_state(1)
@@ -429,7 +430,7 @@ class sipmTemp():
                 raise ValueError("### ERROR: PS did not power on")
 
     def power_off(self):
-        if self.state is 1:
+        if self.state == 1:
             print("--- powering off the PS")
             self.TEC.set_V(0.0)
             self.TEC.set_state(0)

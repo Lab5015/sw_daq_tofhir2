@@ -9,7 +9,7 @@ import sys
 
 def add_calibration_from_rom(connection, portID, slaveID, outputFile):
 	data = connection.read_hv_m95256(portID, slaveID, 0x0000, 8)
-	if data != "PETSYS  ":
+	if data != b"PETSYS  ":
 		sys.stderr.write("ERROR: FEBD (portID %d, slaveID %d) PROM does  not contain a calibration table\n" % (portID, slaveID))
 		exit(1)
 	

@@ -11,7 +11,7 @@ import os.path
 
 def read_multimeter(port):
 	sleep(0.5)
-	port.write(':MEAS:VOLT:DC? \r')
+	port.write(b':MEAS:VOLT:DC? \r')
 	port.flush(); sleep(0.1)
 	reply = port.read(16)
 	reply = reply[:-1]
